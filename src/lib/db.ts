@@ -119,6 +119,15 @@ CREATE TABLE IF NOT EXISTS notifications (
   error TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS backups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  filename TEXT NOT NULL,
+  bytes INTEGER NOT NULL DEFAULT 0,
+  destination TEXT NOT NULL,
+  status TEXT NOT NULL,
+  error TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS freezes (
   client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   agency TEXT NOT NULL,

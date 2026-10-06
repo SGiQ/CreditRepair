@@ -138,6 +138,17 @@ hosts (Vercel, Netlify) will not work. Node 24 or newer is required (`node:sqlit
 set the environment variables above (plus `APP_URL=https://<your-railway-domain>`), and generate a public domain.
 The health check hits `/api/health`.
 
+## Backups
+
+Every night (after `BACKUP_HOUR`, default 3 a.m. server time) the app snapshots the database and the uploaded
+reports into one zip under `data/backups/` (last 7 kept) and, if configured, copies it to an S3-compatible bucket
+(AWS S3, Cloudflare R2, Backblaze B2, …) where it keeps `BACKUP_KEEP_DAYS` (default 30) of history. Set
+`BACKUP_PASSPHRASE` to encrypt backups (AES-256-GCM) — they contain client PII — and keep that passphrase somewhere
+safe, because a backup can't be restored without it. "Back up now" is on the Accounts page.
+
+Restore: stop the app, then `npm run restore -- <backup file>` (with `BACKUP_PASSPHRASE` set if encrypted), then
+start it again. The previous database is kept beside the restored one.
+
 ## Where things live
 
 - `data/` — SQLite database and uploaded reports. Local only and git-ignored. Back it up; it holds client PII.

@@ -10,6 +10,11 @@ interface Notifications {
   recent: { id: number; kind: string; recipient: string; subject: string; status: string; error: string; created_at: string; client_name: string | null; client_id: number | null }[];
 }
 
+interface Backups {
+  config: { hour: number; encrypted: boolean; remote: string | null; keepDays: number };
+  recent: { id: number; created_at: string; filename: string; bytes: number; destination: string; status: string; error: string }[];
+}
+
 interface Accounts {
   me: number;
   admins: { id: number; email: string; created_at: string }[];
@@ -20,6 +25,12 @@ interface Accounts {
 export function AccountsAdmin() {
   const [data, setData] = useState<Accounts | null>(null);
   const [notes, setNotes] = useState<Notifications | null>(null);
+  const [backups, setBackups] = useState<Backups | null>(null);
+  const [backingUp, setBackingUp] = useState(false);
+  const loadBackups = () =>
+    api<Backups>("/api/backup")
+      .then(setBackups)
+      .catch(() => {});
   const [resetLink, setResetLink] = useState<{ id: number; link: string; minutes: number } | null>(null);
 
   async function makeResetLink(id: number) {
@@ -53,6 +64,9 @@ export function AccountsAdmin() {
       .catch((e: Error) => setError(e.message));
     api<Notifications>("/api/notifications")
       .then(setNotes)
+      .catch(() => {});
+    api<Backups>("/api/backup")
+      .then(setBackups)
       .catch(() => {});
   }, []);
 
@@ -188,6 +202,72 @@ export function AccountsAdmin() {
             ))}
           </ul>
         )}
+      </Card>
+
+      <Card className="p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold">Backups</h2>
+          <span className="flex items-center gap-2">
+            {backups && (
+              <Badge tone={backups.config.remote ? (backups.config.encrypted ? "green" : "amber") : "amber"}>
+                {backups.config.remote ? (backups.config.encrypted ? "Nightly, encrypted, off-site" : "Nightly, off-site, not encrypted") : "Nightly, this server only"}
+              </Badge>
+            )}
+            <Button
+              small
+              disabled={backingUp}
+              onClick={async () => {
+                setBackingUp(true);
+                setError("");
+                try {
+                  await api("/api/backup", { json: {} });
+                } catch (e) {
+                  setError((e as Error).message);
+                }
+                await loadBackups();
+                setBackingUp(false);
+              }}
+            >
+              {backingUp ? "Backing up…" : "Back up now"}
+            </Button>
+          </span>
+        </div>
+        <p className="mt-1 text-sm text-stone-600">
+          Every night after {backups ? `${backups.config.hour}:00` : "3:00"} server time, the database and uploaded reports are zipped
+          and kept here (last 7)
+          {backups?.config.remote ? ` and copied to ${backups.config.remote} (kept ${backups.config.keepDays} days)` : ""}.
+          {backups && !backups.config.remote && (
+            <>
+              {" "}
+              A copy on the same disk won&apos;t survive losing the server: set <code className="font-mono">BACKUP_S3_BUCKET</code> and its
+              keys to send backups off-site.
+            </>
+          )}
+          {backups && !backups.config.encrypted && (
+            <>
+              {" "}
+              Set <code className="font-mono">BACKUP_PASSPHRASE</code> to encrypt them — they contain client data.
+            </>
+          )}
+          {" "}Restore with <code className="font-mono">npm run restore -- &lt;file&gt;</code>.
+        </p>
+        {backups && backups.recent.length > 0 && (
+          <ul className="mt-3 divide-y divide-stone-100 text-sm">
+            {backups.recent.slice(0, 5).map((b) => (
+              <li key={b.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2">
+                <span className="min-w-0">
+                  <span className="block truncate font-mono text-xs">{b.filename}</span>
+                  <span className="text-xs text-stone-500">
+                    {fmtDate(b.created_at)} · {(b.bytes / 1024).toFixed(0)} KB · {b.destination}
+                    {b.error && <span className="text-red-700"> · {b.error}</span>}
+                  </span>
+                </span>
+                <Badge tone={b.status === "ok" ? "green" : "red"}>{b.status === "ok" ? "OK" : "Failed"}</Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+        {backups && !backups.recent.length && <p className="mt-3 text-sm text-stone-500">No backups yet. The first runs tonight, or press &ldquo;Back up now&rdquo;.</p>}
       </Card>
 
       <Card className="p-5">

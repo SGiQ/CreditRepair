@@ -9,10 +9,12 @@
     "lint": "eslint",
     "demo": "node --no-warnings scripts/demo.mjs",
     "demo:remove": "node --no-warnings scripts/demo.mjs --remove",
-    "reset-link": "node --no-warnings scripts/reset-link.mjs"
+    "reset-link": "node --no-warnings scripts/reset-link.mjs",
+    "restore": "node --no-warnings scripts/restore.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
+    "@aws-sdk/client-s3": "^3.1146.0",
     "docx": "^9.8.1",
     "jszip": "^3.10.2",
     "next": "16.3.8",
