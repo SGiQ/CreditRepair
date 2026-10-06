@@ -1,0 +1,39 @@
+{
+  "name": "credit-repair",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "demo": "node --no-warnings scripts/demo.mjs",
+    "demo:remove": "node --no-warnings scripts/demo.mjs --remove",
+    "reset-link": "node --no-warnings scripts/reset-link.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "docx": "^9.8.1",
+    "jszip": "^3.10.2",
+    "next": "16.3.8",
+    "nodemailer": "^10.0.15",
+    "pdf-lib": "^1.17.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^24.19.1",
+    "@types/nodemailer": "^8.0.2",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.8",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
