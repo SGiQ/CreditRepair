@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { TabProps } from "./ClientWorkspace";
-import { api, Badge, Button, Card, ErrorNote, inputClass } from "./ui";
+import { api, Badge, Button, Card, ErrorNote, fmtDate, inputClass } from "./ui";
 
 /** Lets the specialist give a client their own login via a one-time invite link. */
 export function PortalAccessCard({ bundle, reload }: TabProps) {
@@ -9,6 +9,7 @@ export function PortalAccessCard({ bundle, reload }: TabProps) {
   const [link, setLink] = useState("");
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const [note, setNote] = useState("");
   if (!access) return null;
 
   async function act(action: "invite" | "revoke") {
@@ -53,6 +54,47 @@ export function PortalAccessCard({ bundle, reload }: TabProps) {
             </Button>
           </div>
           <p className="mt-2 text-xs text-emerald-900/80">Works once, expires in 7 days, and is only shown now. They choose their own password.</p>
+        </div>
+      )}
+
+      {access.status === "active" && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-stone-100 pt-3 text-sm">
+          <label className="flex items-center gap-2 text-stone-700">
+            <input
+              type="checkbox"
+              checked={Boolean(client.report_reminders)}
+              onChange={async (e) => {
+                setError("");
+                try {
+                  await api(`/api/clients/${client.id}/reminders`, { json: { enabled: e.target.checked } });
+                  await reload();
+                } catch (err) {
+                  setError((err as Error).message);
+                }
+              }}
+            />
+            Monthly report-upload reminder email
+          </label>
+          {bundle.email.enabled && (
+            <button
+              className="text-xs font-medium text-emerald-700 hover:underline"
+              onClick={async () => {
+                setError("");
+                setNote("");
+                try {
+                  await api(`/api/clients/${client.id}/reminders`, { json: { send: true } });
+                  setNote(`Reminder sent to ${access.email}.`);
+                  await reload();
+                } catch (err) {
+                  setError((err as Error).message);
+                }
+              }}
+            >
+              Send one now
+            </button>
+          )}
+          {client.report_reminded_at && <span className="text-xs text-stone-500">Last sent {fmtDate(client.report_reminded_at)}</span>}
+          {note && <span className="basis-full text-xs text-emerald-800">{note}</span>}
         </div>
       )}
 

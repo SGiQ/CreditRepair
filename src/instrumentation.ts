@@ -20,4 +20,10 @@ export async function register() {
   const nightly = () => nightlyTick().catch((e) => console.error("nightly backup", e));
   setInterval(nightly, 60 * 60_000).unref?.();
   setTimeout(nightly, 60_000).unref?.();
+
+  // Monthly "upload a fresh report" emails to clients: checked hourly, each client at most once per interval.
+  const { reminderTick } = await import("./lib/reminders");
+  const remind = () => reminderTick().catch((e) => console.error("report reminders", e));
+  setInterval(remind, 60 * 60_000).unref?.();
+  setTimeout(remind, 90_000).unref?.();
 }

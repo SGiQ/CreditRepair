@@ -46,6 +46,9 @@ export interface Client {
   phone: string;
   email: string;
   created_at: string;
+  /** 1 when the client gets the monthly "upload a fresh report" email. */
+  report_reminders: number;
+  report_reminded_at: string;
   /** PNG data URL of the client's drawn signature. Server-side only; never sent in a bundle. */
   signature?: string;
   signature_at?: string;

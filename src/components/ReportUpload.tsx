@@ -11,6 +11,7 @@ export function ReportUpload({
   intro,
   canRemove,
   onReview,
+  reminders,
 }: {
   clientId: number;
   reports: Report[];
@@ -19,6 +20,8 @@ export function ReportUpload({
   intro: string;
   canRemove?: boolean;
   onReview?: () => void;
+  /** Client portal only: their own monthly-reminder preference. */
+  reminders?: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
@@ -72,6 +75,19 @@ export function ReportUpload({
         </Button>
         <p className="mt-2 text-xs text-stone-500">or drop a file here · PDF, TXT or HTML · up to 30 MB</p>
       </div>
+      {reminders !== undefined && (
+        <label className="mt-3 flex items-center gap-2 text-sm text-stone-700">
+          <input
+            type="checkbox"
+            checked={reminders}
+            onChange={async (e) => {
+              await api(`/api/clients/${clientId}/reminders`, { json: { enabled: e.target.checked } }).catch(() => {});
+              await reload();
+            }}
+          />
+          Email me a reminder each month to upload a new report
+        </label>
+      )}
       <div className="mt-3">
         <ErrorNote>{error}</ErrorNote>
       </div>

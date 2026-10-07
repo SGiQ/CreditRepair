@@ -95,6 +95,14 @@ portal. Its "Request a consultation" form saves the inquiry, emails every admin,
 inquiries" on the Dashboard. The form has a spam trap and is limited to 5 submissions per hour per visitor.
 Copy lives in `src/components/Landing.tsx`.
 
+## Monthly report reminders
+
+Clients with a portal login get an email asking them to upload a fresh credit report every 30 days (configurable on
+the Accounts page: 14–90 days, or off). The interval counts from their latest upload, so clients who upload on their
+own aren't reminded, and clients with every item resolved are skipped. Clients can turn it off in their portal; you
+can per client on the Client login card, which also has "Send one now". Reminders go out after `REMINDER_HOUR`
+(UTC, default 15).
+
 ## Client logins
 
 On a client's Overview tab, **Client login → Create invite link** gives you a one-time link (valid 7 days) to send

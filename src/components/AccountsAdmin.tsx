@@ -12,6 +12,7 @@ interface Notifications {
 
 interface Settings {
   payments: { enabled: boolean; mode: string; feeCents: number };
+  reminders: { enabled: boolean; days: number; hour: number };
 }
 
 interface Backups {
@@ -188,6 +189,35 @@ export function AccountsAdmin() {
             {notes?.email.from && notes.email.mode !== "off" && <> Sent from {notes.email.from}.</>}
           </p>
         </div>
+        {settings && (
+          <div className="mx-5 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg bg-stone-50 p-3 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={settings.reminders.enabled}
+                onChange={async (e) => setSettings(await api<Settings>("/api/settings", { json: { remindersEnabled: e.target.checked } }))}
+              />
+              Remind clients to upload a fresh report every
+            </label>
+            <select
+              className={`${inputClass} !w-auto !py-1`}
+              value={settings.reminders.days}
+              disabled={!settings.reminders.enabled}
+              onChange={async (e) => setSettings(await api<Settings>("/api/settings", { json: { reminderDays: Number(e.target.value) } }))}
+            >
+              {[14, 30, 45, 60, 90].map((d) => (
+                <option key={d} value={d}>
+                  {d} days
+                </option>
+              ))}
+            </select>
+            <span className="basis-full text-xs text-stone-500">
+              Counted from each client&apos;s latest upload, so clients who upload on their own aren&apos;t nagged. Only clients with a
+              portal login, and not once every item is resolved. Clients can turn it off in their portal; you can per client on their
+              Overview.
+            </span>
+          </div>
+        )}
         {notes?.email.mode !== "off" && <TestEmail onSent={() => api<Notifications>("/api/notifications").then(setNotes).catch(() => {})} />}
         {notes && !notes.recent.length && <p className="px-5 pb-5 pt-3 text-sm text-stone-500">No emails yet.</p>}
         {notes && notes.recent.length > 0 && (
