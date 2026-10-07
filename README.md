@@ -88,6 +88,13 @@ and the 30-day reply deadline. Set `MAIL_FROM` plus either `RESEND_API_KEY` ([re
 runs every 30 minutes while the app is up (every 20 seconds in mail demo mode), so emails go out even when nobody
 has the app open. `EMAIL_PROVIDER=demo` logs the emails on the Accounts page instead of sending them.
 
+## Landing page and inquiries
+
+Signed-out visitors to `/` see a public landing page; signed-in admins go to the Dashboard and clients to their
+portal. Its "Request a consultation" form saves the inquiry, emails every admin, and lists it under "Website
+inquiries" on the Dashboard. The form has a spam trap and is limited to 5 submissions per hour per visitor.
+Copy lives in `src/components/Landing.tsx`.
+
 ## Client logins
 
 On a client's Overview tab, **Client login → Create invite link** gives you a one-time link (valid 7 days) to send

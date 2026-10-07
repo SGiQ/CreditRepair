@@ -24,6 +24,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <span className="grid h-7 w-7 place-items-center rounded-md bg-emerald-700 text-sm text-white">CR</span>
               Credit Repair Desk
             </Link>
+            {!user && (
+              <Link href="/login" className="rounded-md border border-stone-300 bg-white px-3.5 py-1.5 text-sm font-medium text-stone-800 hover:bg-stone-50">
+                Client sign in
+              </Link>
+            )}
             {user && (
               <div className="flex items-center gap-4 text-sm">
                 {user.role === "admin" && (

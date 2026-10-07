@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ClientForm } from "@/components/ClientForm";
 import { DashboardSummary } from "@/components/DashboardSummary";
+import { LeadsCard } from "@/components/LeadsCard";
 import { api, Badge, Button, Card } from "@/components/ui";
 import type { Client } from "@/lib/types";
 
@@ -24,6 +25,8 @@ export function ClientsHome() {
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="mt-1 text-sm text-stone-600">Every client&apos;s file at a glance, and what needs doing next.</p>
       </div>
+
+      <LeadsCard />
 
       <DashboardSummary />
 
