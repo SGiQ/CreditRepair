@@ -22,6 +22,14 @@ const CLIENT_STATUS: Record<ItemStatus, string> = {
 export function ClientPortal({ id }: { id: number }) {
   const [bundle, setBundle] = useState<ClientBundle | null>(null);
   const [error, setError] = useState("");
+  // Set when PayPal sends the client back after paying.
+  const [notice] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const q = new URLSearchParams(window.location.search);
+    const p = q.get("payment");
+    if (p || q.get("cancelled")) window.history.replaceState(null, "", "/portal");
+    return p === "paid" ? "Payment received — your specialist will mail that letter by certified mail." : p === "pending" ? "PayPal hasn't confirmed the payment yet. Use \"check the payment\" on the letter in a moment." : p === "error" || p === "failed" ? "That payment didn't go through. You can try again from the letter." : q.get("cancelled") ? "Payment cancelled. You can pay later or mail the letter yourself." : "";
+  });
 
   const reload = useCallback(async () => {
     try {
@@ -63,6 +71,7 @@ export function ClientPortal({ id }: { id: number }) {
         <h1 className="text-2xl font-semibold tracking-tight">Hi, {client.name.split(" ")[0]}</h1>
         <p className="mt-1 text-sm text-stone-600">Here&apos;s where your credit file stands.</p>
       </div>
+      {notice && <p className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{notice}</p>}
 
       <StepGuide
         heading="Your steps"
@@ -109,7 +118,7 @@ export function ClientPortal({ id }: { id: number }) {
           {!letters.length && <p className="mt-4 text-sm text-stone-500">No letters yet. They&apos;ll appear here when your specialist has them ready.</p>}
           <ul className="mt-3 divide-y divide-stone-100">
             {letters.map((l) => (
-              <LetterRow key={l.id} letter={l} reload={reload} canApprove={bundle.mail.enabled} hasSignature={bundle.signature.onFile} />
+              <LetterRow key={l.id} letter={l} reload={reload} canApprove={bundle.mail.enabled} hasSignature={bundle.signature.onFile} payments={bundle.payments} />
             ))}
           </ul>
           {letters.length > 1 && (
@@ -153,11 +162,13 @@ function LetterRow({
   reload,
   canApprove,
   hasSignature,
+  payments,
 }: {
   letter: Letter;
   reload: () => Promise<void>;
   canApprove: boolean;
   hasSignature: boolean;
+  payments: ClientBundle["payments"];
 }) {
   const today = new Date().toLocaleDateString("en-CA");
   const [confirming, setConfirming] = useState(false);
@@ -166,6 +177,45 @@ function LetterRow({
   const isCfpb = l.type === "cfpb_complaint";
   const mailable = l.status === "draft";
   const approvable = mailable && canApprove && canMail(l.type) && !l.signed_at;
+  // Once approved, the client picks how it gets mailed.
+  const choosing = mailable && canApprove && canMail(l.type) && Boolean(l.signed_at);
+  const [pay, setPay] = useState<{ approveUrl: string; qr: string; amount: string } | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  async function choose(choice: "self" | "service") {
+    setError("");
+    try {
+      await api(`/api/letters/${l.id}/delivery`, { json: { choice } });
+      await reload();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  async function startPayment() {
+    setError("");
+    try {
+      setPay(await api(`/api/letters/${l.id}/payment`, { json: {} }));
+      await reload();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  async function checkPayment() {
+    setChecking(true);
+    setError("");
+    try {
+      const { status } = await api<{ status: string }>(`/api/letters/${l.id}/payment/check`, { json: {} });
+      if (status === "pending") setError("PayPal hasn't confirmed the payment yet. Finish the PayPal steps, then check again.");
+      if (status === "failed") setError("That payment didn't go through. You can start it again.");
+      if (status === "paid") setPay(null);
+      await reload();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+    setChecking(false);
+  }
+  const feeOn = payments.enabled && payments.feeCents > 0;
+  const fee = `$${(payments.feeCents / 100).toFixed(2)}`;
 
   async function approve() {
     if (!hasSignature) return document.getElementById("signature")?.scrollIntoView({ behavior: "smooth" });
@@ -215,7 +265,7 @@ function LetterRow({
               {hasSignature ? "Approve & sign" : "Add signature to approve"}
             </Button>
           )}
-          {mailable && !confirming && (
+          {mailable && !confirming && l.payment_status !== "paid" && l.delivery_choice !== "service" && (
             <Button small variant={approvable || l.signed_at ? "secondary" : "primary"} onClick={() => setConfirming(true)}>
               {isCfpb ? "I filed this" : "I mailed this"}
             </Button>
@@ -231,7 +281,79 @@ function LetterRow({
           , choose &ldquo;Credit reporting&rdquo;, and paste the text into the &ldquo;What happened&rdquo; box. Then press &ldquo;I filed this&rdquo;.
         </p>
       )}
-      {l.status === "draft" && l.signed_at && <p className="mt-1.5 text-xs text-stone-500">Approved {fmtDate(l.signed_at)}. Your specialist will send it by certified mail.</p>}
+      {choosing && l.payment_status === "paid" && (
+        <p className="mt-1.5 text-xs text-emerald-800">
+          Paid {`$${(l.paid_cents / 100).toFixed(2)}`} on {fmtDate(l.paid_at)}. Your specialist will send it by certified mail.
+        </p>
+      )}
+      {choosing && l.payment_status !== "paid" && l.delivery_choice === "service" && !feeOn && (
+        <p className="mt-1.5 text-xs text-emerald-800">Approved {fmtDate(l.signed_at)}. Your specialist will send it by certified mail.</p>
+      )}
+      {choosing && l.payment_status !== "paid" && l.delivery_choice === "self" && (
+        <p className="mt-1.5 text-xs text-stone-600">
+          You chose to mail this yourself: download, print, sign, and send it by certified mail, then press &ldquo;I mailed this&rdquo;.{" "}
+          {feeOn && (
+            <button className="font-medium text-emerald-700 hover:underline" onClick={() => choose("service")}>
+              Changed your mind? Have it mailed for {fee}.
+            </button>
+          )}
+        </p>
+      )}
+      {choosing && l.payment_status !== "paid" && (l.delivery_choice === "" || (l.delivery_choice === "service" && feeOn)) && (
+        <div className="mt-2.5 rounded-lg bg-stone-50 p-3">
+          {l.delivery_choice === "" && (
+            <>
+              <p className="text-sm font-medium">How should this letter be mailed?</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button small onClick={() => choose("self")}>
+                  I&apos;ll print and mail it myself (free)
+                </Button>
+                <Button small variant="primary" onClick={() => (feeOn ? startPayment() : choose("service"))}>
+                  Mail it for me by certified mail{feeOn ? ` — ${fee}` : ""}
+                </Button>
+              </div>
+            </>
+          )}
+          {l.delivery_choice === "service" && feeOn && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Pay the {fee} mailing fee with PayPal</p>
+              {pay ? (
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={pay.qr} alt="Scan to pay with PayPal on your phone" className="h-36 w-36 rounded border border-stone-200 bg-white" />
+                  <div className="space-y-2 text-sm text-stone-600">
+                    <p>Scan the code with your phone, or:</p>
+                    <a className="inline-flex rounded-md bg-[#0070ba] px-3.5 py-2 text-sm font-semibold text-white hover:bg-[#005ea6]" href={pay.approveUrl} target="_blank" rel="noreferrer">
+                      Pay {pay.amount} with PayPal ↗
+                    </a>
+                    <p>
+                      When you&apos;re done,{" "}
+                      <button className="font-medium text-emerald-700 hover:underline" onClick={checkPayment} disabled={checking}>
+                        {checking ? "checking…" : "check the payment"}
+                      </button>
+                      .
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <Button small variant="primary" onClick={startPayment}>
+                    {l.payment_order_id ? "Continue payment" : `Pay ${fee}`}
+                  </Button>
+                  {l.payment_order_id && (
+                    <Button small onClick={checkPayment} disabled={checking}>
+                      {checking ? "Checking…" : "I've paid — check"}
+                    </Button>
+                  )}
+                  <Button small variant="ghost" onClick={() => choose("self")}>
+                    Mail it myself instead
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
       {l.status === "sent" && l.mail_tracking && !l.mail_test && (
         <p className="mt-1.5 text-xs text-stone-500">
           Certified mail {l.mail_tracking}

@@ -4,6 +4,7 @@ import { run } from "@/lib/db";
 import { bad, ok, idOf, type Ctx } from "@/lib/http";
 import { letterFilename, renderPdf } from "@/lib/letterDoc";
 import { activeProvider, clientAddress, mailConfig, MailError, parseRecipient } from "@/lib/mail";
+import { paymentsConfig, dollars } from "@/lib/payments";
 import { getClient, getLetter, markLetterSent } from "@/lib/store";
 import { canMail } from "@/lib/types";
 
@@ -17,11 +18,15 @@ export async function POST(req: Request, ctx: Ctx) {
   const letter = getLetter(await idOf(ctx));
   const client = letter && getClient(letter.client_id);
   if (!letter || !client) return bad("Letter not found", 404);
-  const { preview = false, returnReceipt = false } = await req.json().catch(() => ({}));
+  const { preview = false, returnReceipt = false, waiveFee = false } = await req.json().catch(() => ({}));
 
   if (!canMail(letter.type)) return bad("This document can't be sent through the mail service.");
   if (letter.status !== "draft") return bad("This letter has already been sent.");
   if (!letter.signed_at || !client.signature) return bad("The client hasn't approved and signed this letter yet.");
+  // When a mailing fee is set, the client pays before the letter goes out unless the specialist waives it.
+  const { feeCents } = paymentsConfig();
+  const feeDue = feeCents > 0 && letter.payment_status !== "paid" && !waiveFee;
+  if (feeDue && !preview) return bad(`${client.name.split(" ")[0]} hasn't paid the ${dollars(feeCents)} mailing fee yet. Wait for payment, or choose "Send without charging".`);
 
   try {
     const { name, api } = activeProvider();
@@ -30,7 +35,7 @@ export async function POST(req: Request, ctx: Ctx) {
     const pdf = await renderPdf(client, letter);
     const pages = (await PDFDocument.load(pdf)).getPageCount();
     const { mode } = mailConfig();
-    if (preview) return ok({ pages, mode, to });
+    if (preview) return ok({ pages, mode, to, feeCents, paid: letter.payment_status === "paid", paidCents: letter.paid_cents });
 
     const result = await api.send({
       letterId: letter.id,

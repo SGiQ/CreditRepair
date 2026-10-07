@@ -188,6 +188,13 @@ export interface Letter {
   mail_preview: string;
   /** True when the send was a test or simulation and nothing was physically mailed. */
   mail_test: boolean;
+  /** How the client chose to get this letter mailed: "self" (they print and mail it) or "service" (sent from the app). */
+  delivery_choice: "" | "self" | "service";
+  /** Mailing-fee payment for a "service" letter. */
+  payment_status: "" | "pending" | "paid";
+  payment_order_id: string;
+  paid_cents: number;
+  paid_at: string;
 }
 
 /** Mailed disputes start a 30-day reply clock; freeze requests and CFPB filings are tracked without one. */
@@ -214,6 +221,14 @@ export interface Notification {
   status: "sent" | "logged" | "failed";
   error: string;
   created_at: string;
+}
+
+export interface PaymentsConfig {
+  enabled: boolean;
+  /** "sandbox" and "demo" never move real money. */
+  mode: "live" | "sandbox" | "demo" | "off";
+  /** Per-letter mailing fee in cents; 0 means mailing is free to the client. */
+  feeCents: number;
 }
 
 export interface MailConfig {
@@ -257,6 +272,7 @@ export interface ClientBundle {
   signature: { onFile: boolean; at: string; image?: string };
   mail: MailConfig;
   email: EmailConfig;
+  payments: PaymentsConfig;
   reports: Report[];
   items: Item[];
   letters: Letter[];

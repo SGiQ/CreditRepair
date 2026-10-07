@@ -64,6 +64,13 @@ Letters can be mailed from the app through [Lob](https://www.lob.com) as USPS Ce
 3. On the Letters tab, **Send certified mail** shows the parsed address and page count, then sends on confirm.
    The tracking number and delivery date come back automatically, and the 30-day clock runs from delivery.
 
+**Who mails it, and who pays.** After approving a letter, the client chooses: print and mail it themselves (free),
+or have it sent by certified mail for a per-letter fee you set on the Accounts page. The fee is paid to your PayPal
+account through a PayPal button or a QR code they scan with their phone; the app only lets you send the letter once
+PayPal confirms the payment, and you can always "send without charging". Set `PAYPAL_CLIENT_ID`,
+`PAYPAL_CLIENT_SECRET` and `PAYPAL_ENV` (`sandbox` to test, `live` for real money) from developer.paypal.com;
+`PAYMENTS_PROVIDER=demo` simulates checkout. A fee of 0 removes the payment step.
+
 For instant tracking updates, create a webhook in the Lob dashboard pointing at `https://your-host/api/webhooks/lob`,
 subscribed to the `letter.certified.*` events, and put its secret in `.env.local` as `LOB_WEBHOOK_SECRET`. Every call
 is checked against that secret (HMAC-SHA256 of `timestamp.body`, 5-minute tolerance) and the letter's status is

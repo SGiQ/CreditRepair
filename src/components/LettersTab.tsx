@@ -188,7 +188,9 @@ export function LettersTab({ bundle, reload, picked }: TabProps & { picked: numb
 }
 
 function LetterCard({ letter: l, bundle, reload }: { letter: Letter; bundle: ClientBundle; reload: () => Promise<void> }) {
-  const { items, mail, access, client, notifications = [] } = bundle;
+  const { items, mail, access, client, notifications = [], payments } = bundle;
+  const feeOn = payments.feeCents > 0;
+  const money = (c: number) => `$${(c / 100).toFixed(2)}`;
   const emailed = notifications.filter((n) => n.letter_id === l.id && n.kind.startsWith("delivered"));
   const first = client.name.split(" ")[0];
   const mailable = mail.enabled && l.status === "draft" && canMail(l.type);
@@ -287,10 +289,14 @@ function LetterCard({ letter: l, bundle, reload }: { letter: Letter; bundle: Cli
       {mailable && l.signed_at && !sending && (
         <p className="mt-2 text-xs text-emerald-800">
           Approved and signed by {first} on {fmtDate(l.signed_at)}.
+          {l.payment_status === "paid" && ` Mailing fee ${money(l.paid_cents)} paid ${fmtDate(l.paid_at)}.`}
+          {l.payment_status !== "paid" && l.delivery_choice === "self" && ` ${first} chose to print and mail it themselves.`}
+          {l.payment_status !== "paid" && l.delivery_choice === "service" && feeOn && ` ${first} chose certified mail; the ${money(payments.feeCents)} fee is unpaid.`}
+          {l.payment_status !== "paid" && l.delivery_choice === "" && feeOn && ` Waiting for ${first} to choose self-mail or pay the ${money(payments.feeCents)} fee.`}
           {l.mail_test && l.mail_id ? " A test send was accepted; nothing was mailed." : ""}
         </p>
       )}
-      {sending && <SendPanel letter={l} mode={mail.mode} onClose={() => setSending(false)} reload={reload} />}
+      {sending && <SendPanel letter={l} mode={mail.mode} feeCents={payments.feeCents} onClose={() => setSending(false)} reload={reload} />}
 
       {l.mail_id && l.status === "sent" && (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-stone-50 px-3 py-2 text-sm">
@@ -417,7 +423,9 @@ function LetterCard({ letter: l, bundle, reload }: { letter: Letter; bundle: Cli
 }
 
 /** Checks the letter with the server, shows exactly what will go out, and only sends on an explicit confirm. */
-function SendPanel({ letter: l, mode, onClose, reload }: { letter: Letter; mode: ClientBundle["mail"]["mode"]; onClose: () => void; reload: () => Promise<void> }) {
+function SendPanel({ letter: l, mode, feeCents, onClose, reload }: { letter: Letter; mode: ClientBundle["mail"]["mode"]; feeCents: number; onClose: () => void; reload: () => Promise<void> }) {
+  const feeDue = feeCents > 0 && l.payment_status !== "paid";
+  const [waive, setWaive] = useState(false);
   type Check = { pages: number; to: { name: string; company?: string; line1: string; line2?: string; city: string; state: string; zip: string } };
   const [check, setCheck] = useState<Check | null>(null);
   const [error, setError] = useState("");
@@ -434,7 +442,7 @@ function SendPanel({ letter: l, mode, onClose, reload }: { letter: Letter; mode:
     setBusy(true);
     setError("");
     try {
-      await api(`/api/letters/${l.id}/mail`, { json: { returnReceipt: receipt } });
+      await api(`/api/letters/${l.id}/mail`, { json: { returnReceipt: receipt, waiveFee: waive } });
       await reload();
       onClose();
     } catch (e) {
@@ -469,6 +477,15 @@ function SendPanel({ letter: l, mode, onClose, reload }: { letter: Letter; mode:
             <input type="checkbox" checked={receipt} onChange={(e) => setReceipt(e.target.checked)} />
             Add electronic return receipt (recipient&apos;s signature; costs extra)
           </label>
+          {feeDue && (
+            <label className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
+              <input type="checkbox" className="mt-0.5" checked={waive} onChange={(e) => setWaive(e.target.checked)} />
+              <span>
+                The client hasn&apos;t paid the ${(feeCents / 100).toFixed(2)} mailing fee. Send anyway without charging them.
+              </span>
+            </label>
+          )}
+          {feeCents > 0 && l.payment_status === "paid" && <p className="text-xs text-emerald-800">Mailing fee ${(l.paid_cents / 100).toFixed(2)} received.</p>}
           <p className="text-xs text-stone-700">
             {mode === "live" && "This prints and mails a real letter. Lob bills your account at your plan's certified-mail rate, and it can't be recalled from here once sent."}
             {mode === "test" && "Test key: Lob checks the request and makes a proof, but nothing is printed, mailed or billed. The letter stays a draft."}
@@ -479,7 +496,7 @@ function SendPanel({ letter: l, mode, onClose, reload }: { letter: Letter; mode:
       {!check && !error && <p className="text-stone-600">Checking the letter and addresses…</p>}
       <ErrorNote>{error}</ErrorNote>
       <div className="flex gap-2">
-        <Button small variant="primary" disabled={!check || busy} onClick={send}>
+        <Button small variant="primary" disabled={!check || busy || (feeDue && !waive)} onClick={send}>
           {busy ? <Spinner /> : null}
           {mode === "live" ? "Mail it now" : mode === "test" ? "Run test send" : "Simulate send"}
         </Button>

@@ -3,6 +3,7 @@ import type { Client, ClientBundle, Freeze, Item, Letter, Notification, PortalAc
 import { hasApiKey } from "./agent";
 import { emailConfig } from "./email";
 import { mailConfig, refreshStaleTracking } from "./mail";
+import { paymentsConfig, provider } from "./payments";
 
 type Raw = Record<string, unknown>;
 const j = <T>(v: unknown, fallback: T): T => {
@@ -68,6 +69,7 @@ export function getBundle(id: number, role: "admin" | "client" = "admin"): Clien
   );
   const mail = mailConfig();
   const email = emailConfig();
+  const payments = paymentsConfig();
   const scores = all<Score>("SELECT id, bureau, score, model, as_of, source FROM scores WHERE client_id = ? ORDER BY as_of, id", id);
   if (role === "client") {
     return {
@@ -75,6 +77,7 @@ export function getBundle(id: number, role: "admin" | "client" = "admin"): Clien
       signature: { onFile: Boolean(signature), at: signature_at, image: signature },
       mail,
       email,
+      payments,
       reports: reports.map((r) => (r.status === "error" ? { ...r, error: "We couldn't read this file. Try uploading it again, or contact your specialist." } : r)),
       items: getItems(id).map((i) => ({ ...i, notes: "" })),
       letters: getLetters(id).filter((l) => l.status === "draft" || l.status === "sent"),
@@ -90,6 +93,7 @@ export function getBundle(id: number, role: "admin" | "client" = "admin"): Clien
     signature: { onFile: Boolean(signature), at: signature_at },
     mail,
     email,
+    payments,
     notifications: all<Notification>(
       "SELECT id, letter_id, kind, recipient, subject, status, error, created_at FROM notifications WHERE client_id = ? ORDER BY id DESC LIMIT 20",
       id,
@@ -112,4 +116,19 @@ export function markLetterSent(letter: Letter, date: string) {
       itemId,
     );
   }
+}
+
+/** Asks the payment provider about a letter's order and records a completed payment. Returns the resulting status. */
+export async function settleLetterPayment(letter: Letter): Promise<"paid" | "pending" | "failed"> {
+  if (letter.payment_status === "paid") return "paid";
+  const result = await provider().settle(letter.payment_order_id);
+  if (result.status === "paid") {
+    run("UPDATE letters SET payment_status = 'paid', paid_cents = ?, paid_at = datetime('now'), delivery_choice = 'service' WHERE id = ?", result.cents, letter.id);
+    return "paid";
+  }
+  if (result.status === "other") {
+    run("UPDATE letters SET payment_status = '', payment_order_id = '' WHERE id = ?", letter.id);
+    return "failed";
+  }
+  return "pending";
 }

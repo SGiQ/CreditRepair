@@ -128,6 +128,10 @@ CREATE TABLE IF NOT EXISTS backups (
   error TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS freezes (
   client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   agency TEXT NOT NULL,
@@ -152,6 +156,11 @@ const COLUMNS: [table: string, column: string, ddl: string][] = [
   ["letters", "mail_test", "INTEGER NOT NULL DEFAULT 0"],
   ["letters", "mail_checked_at", "TEXT NOT NULL DEFAULT ''"],
   ["letters", "delivered_notified_at", "TEXT NOT NULL DEFAULT ''"],
+  ["letters", "delivery_choice", "TEXT NOT NULL DEFAULT ''"],
+  ["letters", "payment_status", "TEXT NOT NULL DEFAULT ''"],
+  ["letters", "payment_order_id", "TEXT NOT NULL DEFAULT ''"],
+  ["letters", "paid_cents", "INTEGER NOT NULL DEFAULT 0"],
+  ["letters", "paid_at", "TEXT NOT NULL DEFAULT ''"],
 ];
 
 // Survive dev-server hot reloads with a single connection, but re-apply the
@@ -201,3 +210,7 @@ export function updateRow(table: string, id: number, patch: Row, allowed: readon
   });
   run(`UPDATE ${table} SET ${cols.map((c) => `${c} = ?`).join(", ")} WHERE id = ?`, ...vals, id);
 }
+
+export const getSetting = (key: string, fallback = "") => get<{ value: string }>("SELECT value FROM settings WHERE key = ?", key)?.value ?? fallback;
+export const setSetting = (key: string, value: string) =>
+  run("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", key, value);

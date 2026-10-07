@@ -10,6 +10,10 @@ interface Notifications {
   recent: { id: number; kind: string; recipient: string; subject: string; status: string; error: string; created_at: string; client_name: string | null; client_id: number | null }[];
 }
 
+interface Settings {
+  payments: { enabled: boolean; mode: string; feeCents: number };
+}
+
 interface Backups {
   config: { hour: number; encrypted: boolean; remote: string | null; keepDays: number };
   recent: { id: number; created_at: string; filename: string; bytes: number; destination: string; status: string; error: string }[];
@@ -26,6 +30,9 @@ export function AccountsAdmin() {
   const [data, setData] = useState<Accounts | null>(null);
   const [notes, setNotes] = useState<Notifications | null>(null);
   const [backups, setBackups] = useState<Backups | null>(null);
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [fee, setFee] = useState("");
+  const [feeMsg, setFeeMsg] = useState("");
   const [backingUp, setBackingUp] = useState(false);
   const loadBackups = () =>
     api<Backups>("/api/backup")
@@ -67,6 +74,12 @@ export function AccountsAdmin() {
       .catch(() => {});
     api<Backups>("/api/backup")
       .then(setBackups)
+      .catch(() => {});
+    api<Settings>("/api/settings")
+      .then((s) => {
+        setSettings(s);
+        setFee((s.payments.feeCents / 100).toFixed(2));
+      })
       .catch(() => {});
   }, []);
 
@@ -202,6 +215,51 @@ export function AccountsAdmin() {
               </li>
             ))}
           </ul>
+        )}
+      </Card>
+
+      <Card className="p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold">Mailing fee &amp; PayPal</h2>
+          {settings && (
+            <Badge tone={settings.payments.mode === "live" ? "green" : settings.payments.mode === "off" ? "stone" : "amber"}>
+              {settings.payments.mode === "live" ? "PayPal live" : settings.payments.mode === "sandbox" ? "PayPal sandbox" : settings.payments.mode === "demo" ? "Demo — no real payments" : "PayPal not connected"}
+            </Badge>
+          )}
+        </div>
+        <p className="mt-1 text-sm text-stone-600">
+          After approving a letter, clients choose to print and mail it themselves (free) or have it sent by certified mail
+          for this fee, paid to your PayPal account by button or QR code. Set the fee to 0 to skip payment entirely.
+          {settings?.payments.mode === "off" && (
+            <>
+              {" "}
+              To take payments, add <code className="font-mono">PAYPAL_CLIENT_ID</code> and <code className="font-mono">PAYPAL_CLIENT_SECRET</code>{" "}
+              (and <code className="font-mono">PAYPAL_ENV=live</code> when ready) to the app&apos;s environment.
+            </>
+          )}
+        </p>
+        <form
+          className="mt-3 flex flex-wrap items-end gap-2"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setFeeMsg("");
+            try {
+              const s = await api<Settings>("/api/settings", { json: { feeDollars: fee } });
+              setSettings(s);
+              setFeeMsg(s.payments.feeCents ? `Clients now pay $${(s.payments.feeCents / 100).toFixed(2)} per mailed letter.` : "Mailing is free to clients; no payment step.");
+            } catch (err) {
+              setFeeMsg((err as Error).message);
+            }
+          }}
+        >
+          <Field label="Fee per mailed letter (USD)" type="number" min={0} step="0.01" className="w-48" value={fee} onChange={(e) => setFee(e.target.value)} />
+          <Button small className="!py-2">
+            Save fee
+          </Button>
+          {feeMsg && <span className="basis-full text-xs text-stone-600">{feeMsg}</span>}
+        </form>
+        {settings && settings.payments.feeCents > 0 && !settings.payments.enabled && (
+          <p className="mt-2 text-xs text-amber-700">A fee is set but PayPal isn&apos;t connected, so clients can&apos;t pay yet. You can still send letters with &ldquo;send without charging&rdquo;.</p>
         )}
       </Card>
 
