@@ -68,6 +68,7 @@ export function OverviewTab({ bundle, reload, goTo }: TabProps & { goTo: (tab: s
         <ReportUpload
           clientId={client.id}
           reports={reports}
+          scores={bundle.scores}
           reload={reload}
           canRemove
           intro="Upload the client's report (PDF from annualcreditreport.com or a monitoring service). The agent reads every account and builds the dispute plan."

@@ -1,11 +1,12 @@
 "use client";
 import { useRef, useState } from "react";
-import type { Report } from "@/lib/types";
+import type { Report, Score } from "@/lib/types";
 import { api, Badge, Button, Card, ErrorNote, fmtDate, Spinner } from "./ui";
 
 export function ReportUpload({
   clientId,
   reports,
+  scores,
   reload,
   intro,
   canRemove,
@@ -13,6 +14,7 @@ export function ReportUpload({
 }: {
   clientId: number;
   reports: Report[];
+  scores: Score[];
   reload: () => Promise<void>;
   intro: string;
   canRemove?: boolean;
@@ -102,6 +104,20 @@ export function ReportUpload({
             )}
             {r.status === "error" && <p className="mt-2 text-red-700">{r.error}</p>}
             {r.summary && <p className="mt-2 leading-relaxed text-stone-700">{r.summary}</p>}
+            {r.status === "done" &&
+              (() => {
+                const found = scores.filter((s) => s.report_id === r.id);
+                return found.length ? (
+                  <p className="mt-2 text-xs text-emerald-800">
+                    Scores recorded from this report: {found.map((s) => `${s.bureau} ${s.score}`).join(", ")}.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-stone-500">
+                    No credit score is printed on this report, so none was recorded. Reports from annualcreditreport.com don&apos;t
+                    include scores. Use &ldquo;Add a score&rdquo; to enter one from a bank, card issuer or monitoring app.
+                  </p>
+                );
+              })()}
             {r.status === "done" && onReview && (
               <button onClick={onReview} className="mt-2 text-sm font-medium text-emerald-700 hover:underline">
                 Review the items →

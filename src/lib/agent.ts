@@ -75,7 +75,9 @@ const AnalysisSchema = z.object({
         model: z.string().describe("Scoring model as labelled, e.g. \"FICO 8\" or \"VantageScore 3.0\"; empty if not stated"),
       }),
     )
-    .describe("Credit scores printed on the report, one per bureau. Empty if the report shows no scores."),
+    .describe(
+      "Credit scores printed anywhere in the document (summary pages, headers, score sections), one per bureau, e.g. FICO or VantageScore. Do not estimate or infer a score. Empty if none is printed.",
+    ),
   items: z.array(ItemSchema),
 });
 export type Analysis = z.infer<typeof AnalysisSchema>;

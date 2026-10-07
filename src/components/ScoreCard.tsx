@@ -92,7 +92,13 @@ export function ScoreCard({
         </form>
       )}
 
-      {!byBureau.length && !adding && <p className="mt-4 text-sm text-stone-500">No scores recorded yet.</p>}
+      {!byBureau.length && !adding && (
+        <p className="mt-4 text-sm text-stone-500">
+          No scores recorded yet. Scores are picked up automatically only when they&apos;re printed on an uploaded report, and the
+          free reports from annualcreditreport.com don&apos;t include one. Press &ldquo;Add a score&rdquo; to enter a score from a
+          bank or card statement, Credit Karma, the Experian app or myFICO.
+        </p>
+      )}
 
       <ul className="mt-4 divide-y divide-stone-100">
         {byBureau.map(({ bureau, readings }) => {

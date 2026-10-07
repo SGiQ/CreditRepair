@@ -70,7 +70,7 @@ export function getBundle(id: number, role: "admin" | "client" = "admin"): Clien
   const mail = mailConfig();
   const email = emailConfig();
   const payments = paymentsConfig();
-  const scores = all<Score>("SELECT id, bureau, score, model, as_of, source FROM scores WHERE client_id = ? ORDER BY as_of, id", id);
+  const scores = all<Score>("SELECT id, report_id, bureau, score, model, as_of, source FROM scores WHERE client_id = ? ORDER BY as_of, id", id);
   if (role === "client") {
     return {
       client,

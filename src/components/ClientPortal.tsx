@@ -103,6 +103,7 @@ export function ClientPortal({ id }: { id: number }) {
         <ReportUpload
           clientId={client.id}
           reports={reports}
+          scores={bundle.scores}
           reload={reload}
           intro="Upload your latest credit report — a PDF from annualcreditreport.com or your credit monitoring service. New reports every 30–45 days show what changed."
         />

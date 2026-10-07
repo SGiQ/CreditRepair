@@ -239,6 +239,8 @@ export interface MailConfig {
 
 export interface Score {
   id: number;
+  /** Set when the score was read from an uploaded report. */
+  report_id: number | null;
   bureau: Bureau;
   score: number;
   /** Scoring model as labelled on the report, e.g. "FICO 8" or "VantageScore 3.0". */
