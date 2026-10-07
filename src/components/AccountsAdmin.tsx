@@ -175,6 +175,7 @@ export function AccountsAdmin() {
             {notes?.email.from && notes.email.mode !== "off" && <> Sent from {notes.email.from}.</>}
           </p>
         </div>
+        {notes?.email.mode !== "off" && <TestEmail onSent={() => api<Notifications>("/api/notifications").then(setNotes).catch(() => {})} />}
         {notes && !notes.recent.length && <p className="px-5 pb-5 pt-3 text-sm text-stone-500">No emails yet.</p>}
         {notes && notes.recent.length > 0 && (
           <ul className="mt-3 divide-y divide-stone-100 border-t border-stone-100">
@@ -341,6 +342,37 @@ export function AccountsAdmin() {
         </ul>
       </Card>
     </div>
+  );
+}
+
+function TestEmail({ onSent }: { onSent: () => void }) {
+  const [to, setTo] = useState("");
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <form
+      className="mx-5 mt-3 flex flex-wrap items-end gap-2"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setMsg("");
+        try {
+          await api("/api/notifications/test", { json: { to } });
+          setMsg(`Sent to ${to}. Check the inbox (and spam folder).`);
+          setTo("");
+          onSent();
+        } catch (err) {
+          setMsg((err as Error).message);
+        }
+        setBusy(false);
+      }}
+    >
+      <Field label="Send a test email to" type="email" required className="w-72" value={to} onChange={(e) => setTo(e.target.value)} />
+      <Button small className="!py-2" disabled={busy || !to}>
+        {busy ? "Sending…" : "Send test"}
+      </Button>
+      {msg && <span className="basis-full text-xs text-stone-600">{msg}</span>}
+    </form>
   );
 }
 
