@@ -20,6 +20,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
     Object.assign(b, { sent_at: "", response: "" });
     run("UPDATE letters SET delivered_at = '', mail_id = '', mail_tracking = '', mail_status = '', mail_expected = '', mail_preview = '', mail_test = 0 WHERE id = ?", id);
   }
+  if ("body" in b && !String(b.body ?? "").trim() && letter.body.trim()) {
+    return bad("The letter body can't be empty. Reload the page if the text isn't showing.");
+  }
   // The client's approval covers the exact text they saw; any change needs a fresh approval.
   const edited = (["recipient_name", "recipient_address", "subject", "body"] as const).some((k) => k in b && b[k] !== letter[k]);
   if (edited) {

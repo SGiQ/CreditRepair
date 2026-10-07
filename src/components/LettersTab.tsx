@@ -180,7 +180,7 @@ export function LettersTab({ bundle, reload, picked }: TabProps & { picked: numb
           </Card>
         )}
         {letters.map((l) => (
-          <LetterCard key={l.id} letter={l} bundle={bundle} reload={reload} />
+          <LetterCard key={`${l.id}-${l.status}`} letter={l} bundle={bundle} reload={reload} />
         ))}
       </div>
     </div>
@@ -245,7 +245,15 @@ function LetterCard({ letter: l, bundle, reload }: { letter: Letter; bundle: Cli
         <div className="flex flex-wrap items-center gap-1.5">
           {(l.status === "draft" || l.status === "sent") && (
             <>
-              <Button small onClick={() => setOpen(!open)} aria-expanded={open}>
+              <Button
+                small
+                onClick={() => {
+                  // Start the editor from the letter as it is now: it may have been opened while still being written.
+                  if (!open) setDraft(l);
+                  setOpen(!open);
+                }}
+                aria-expanded={open}
+              >
                 {open ? "Close" : "Review & edit"}
               </Button>
               <a className={linkButton()} href={`/api/letters/${l.id}/download?format=pdf`}>
