@@ -265,6 +265,11 @@ function LetterRow({
               {hasSignature ? "Approve & sign" : "Add signature to approve"}
             </Button>
           )}
+          {mailable && !canApprove && canMail(l.type) && (
+            <Button small disabled title="Certified mailing from the app is coming soon. For now, please print and mail this letter yourself.">
+              Mail it for me — coming soon
+            </Button>
+          )}
           {mailable && !confirming && l.payment_status !== "paid" && l.delivery_choice !== "service" && (
             <Button small variant={approvable || l.signed_at ? "secondary" : "primary"} onClick={() => setConfirming(true)}>
               {isCfpb ? "I filed this" : "I mailed this"}
