@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { SCORE_MODELS, scoreSeries } from "@/lib/scores";
 import { BUREAUS, type Bureau, type Score } from "@/lib/types";
 import { api, Badge, Button, Card, ErrorNote, fmtDate, inputClass } from "./ui";
 
@@ -17,16 +18,27 @@ export function ScoreCard({
 }) {
   const [adding, setAdding] = useState(false);
   const [showAll, setShowAll] = useState(false);
-  const [form, setForm] = useState({ bureau: "Equifax" as Bureau, score: "", model: "", as_of: new Date().toLocaleDateString("en-CA") });
+  // Default to the model used most recently, so repeat entries stay comparable.
+  const lastModel = [...scores].sort((a, b) => b.as_of.localeCompare(a.as_of) || b.id - a.id)[0]?.model ?? "";
+  const [form, setForm] = useState({
+    bureau: "Equifax" as Bureau,
+    score: "",
+    model: lastModel && !SCORE_MODELS.includes(lastModel) ? "other" : lastModel,
+    otherModel: lastModel && !SCORE_MODELS.includes(lastModel) ? lastModel : "",
+    as_of: new Date().toLocaleDateString("en-CA"),
+  });
   const [error, setError] = useState("");
-  const byBureau = BUREAUS.map((b) => ({ bureau: b, readings: scores.filter((s) => s.bureau === b) })).filter((x) => x.readings.length);
+  const series = scoreSeries(scores);
+  const mixed = BUREAUS.some((b) => series.filter((s) => s.bureau === b).length > 1);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     try {
-      await api(`/api/clients/${clientId}/scores`, { json: form });
-      setForm({ ...form, score: "", model: "" });
+      const model = form.model === "other" ? form.otherModel.trim() : form.model;
+      if (!model && !confirm("Save without a scoring model? Unlabelled readings are only compared with other unlabelled readings.")) return;
+      await api(`/api/clients/${clientId}/scores`, { json: { bureau: form.bureau, score: form.score, model, as_of: form.as_of } });
+      setForm({ ...form, score: "" });
       setAdding(false);
       await reload();
     } catch (err) {
@@ -71,8 +83,17 @@ export function ScoreCard({
             <input className={`${inputClass} mt-1 font-normal`} type="number" min={300} max={850} required value={form.score} onChange={(e) => setForm({ ...form, score: e.target.value })} />
           </label>
           <label className="text-xs font-medium text-stone-600">
-            Model <span className="font-normal text-stone-400">(optional)</span>
-            <input className={`${inputClass} mt-1 font-normal`} placeholder="FICO 8" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
+            Scoring model
+            <select className={`${inputClass} mt-1 font-normal`} value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })}>
+              <option value="">Not sure</option>
+              {SCORE_MODELS.map((m) => (
+                <option key={m}>{m}</option>
+              ))}
+              <option value="other">Other…</option>
+            </select>
+            {form.model === "other" && (
+              <input className={`${inputClass} mt-1 font-normal`} placeholder="e.g. FICO Auto 9" required value={form.otherModel} onChange={(e) => setForm({ ...form, otherModel: e.target.value })} />
+            )}
           </label>
           <label className="text-xs font-medium text-stone-600">
             Date checked
@@ -92,7 +113,7 @@ export function ScoreCard({
         </form>
       )}
 
-      {!byBureau.length && !adding && (
+      {!series.length && !adding && (
         <p className="mt-4 text-sm text-stone-500">
           No scores recorded yet. Scores are picked up automatically only when they&apos;re printed on an uploaded report, and the
           free reports from annualcreditreport.com don&apos;t include one. Press &ldquo;Add a score&rdquo; to enter a score from a
@@ -101,19 +122,19 @@ export function ScoreCard({
       )}
 
       <ul className="mt-4 divide-y divide-stone-100">
-        {byBureau.map(({ bureau, readings }) => {
+        {series.map(({ key, bureau, model, readings, change }) => {
           const first = readings[0];
           const latest = readings[readings.length - 1];
-          const delta = latest.score - first.score;
+          const delta = change ?? 0;
           return (
-            <li key={bureau} className="flex flex-wrap items-center gap-x-5 gap-y-2 py-3">
-              <div className="w-28">
+            <li key={key} className="flex flex-wrap items-center gap-x-5 gap-y-2 py-3">
+              <div className="w-36">
                 <div className="text-sm font-medium">{bureau}</div>
-                <div className="text-xs text-stone-500">{latest.model || "score"}</div>
+                <div className="text-xs text-stone-500">{model || "Model not recorded"}</div>
               </div>
               <div className="text-3xl font-semibold tabular-nums tracking-tight">{latest.score}</div>
               <div className="min-w-32 text-xs text-stone-500">
-                {readings.length > 1 ? (
+                {change !== null ? (
                   <>
                     <Badge tone={delta > 0 ? "green" : delta < 0 ? "red" : "stone"}>
                       {delta > 0 ? "▲ +" : delta < 0 ? "▼ " : ""}
@@ -130,6 +151,13 @@ export function ScoreCard({
           );
         })}
       </ul>
+
+      {mixed && (
+        <p className="mt-2 text-xs text-stone-500">
+          Different scoring models are tracked separately, since a FICO and a VantageScore for the same bureau can differ by
+          tens of points. Each change compares one model with itself.
+        </p>
+      )}
 
       {scores.length > 0 && (
         <div className="mt-2">
@@ -189,7 +217,7 @@ function Sparkline({ readings }: { readings: Score[] }) {
     r,
   }));
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="flex-none" role="img" aria-label={`${readings[0].bureau} score history`}>
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="flex-none" role="img" aria-label={`${readings[0].bureau} ${readings[0].model} score history`}>
       <polyline fill="none" stroke="#047857" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" points={pts.map((p) => `${p.x},${p.y}`).join(" ")} />
       {pts.map((p) => (
         <circle key={p.r.id} cx={p.x} cy={p.y} r={4} fill="#047857" stroke="#fff" strokeWidth="2">

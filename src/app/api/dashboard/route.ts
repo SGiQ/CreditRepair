@@ -1,6 +1,8 @@
 import { requireAdmin } from "@/lib/auth";
 import { all, get } from "@/lib/db";
 import { ok } from "@/lib/http";
+import { scoreSeries } from "@/lib/scores";
+import type { Score } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -55,19 +57,20 @@ export async function GET() {
   const items = statuses.reduce((s, r) => s + r.n, 0);
   const resolved = statuses.filter((r) => r.status === "deleted" || r.status === "updated").reduce((s, r) => s + r.n, 0);
 
-  // Change from the first to the latest reading, per client and bureau, averaged across every pair with 2+ readings.
-  const scoreRows = all<{ client_id: number; bureau: string; first: number; latest: number }>(`
-    SELECT client_id, bureau,
-      (SELECT score FROM scores s2 WHERE s2.client_id = s.client_id AND s2.bureau = s.bureau ORDER BY as_of, id LIMIT 1) AS first,
-      (SELECT score FROM scores s2 WHERE s2.client_id = s.client_id AND s2.bureau = s.bureau ORDER BY as_of DESC, id DESC LIMIT 1) AS latest
-    FROM scores s GROUP BY client_id, bureau HAVING COUNT(*) > 1`);
-  const scoreChange = scoreRows.length
-    ? Math.round(scoreRows.reduce((sum, r) => sum + (r.latest - r.first), 0) / scoreRows.length)
-    : null;
+  // Change from first to latest reading within each client + bureau + scoring model, averaged over every series
+  // with 2+ readings. Different models are never compared with each other.
+  const allScores = all<Score & { client_id: number }>("SELECT id, client_id, report_id, bureau, score, model, as_of, source FROM scores");
+  const byClient = new Map<number, Score[]>();
+  for (const s of allScores) byClient.set(s.client_id, [...(byClient.get(s.client_id) ?? []), s]);
+  const changes: { client_id: number; change: number }[] = [];
+  for (const [client_id, list] of byClient) {
+    for (const series of scoreSeries(list)) if (series.change !== null) changes.push({ client_id, change: series.change });
+  }
+  const scoreChange = changes.length ? Math.round(changes.reduce((sum, c) => sum + c.change, 0) / changes.length) : null;
 
   return ok({
     score_change: scoreChange,
-    score_clients: new Set(scoreRows.map((r) => r.client_id)).size,
+    score_clients: new Set(changes.map((c) => c.client_id)).size,
     totals: {
       clients: rows.length,
       items,

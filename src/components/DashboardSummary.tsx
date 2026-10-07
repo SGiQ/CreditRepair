@@ -32,7 +32,7 @@ export function DashboardSummary() {
     {
       label: "Avg. score change",
       value: d.score_change === null ? "—" : `${d.score_change > 0 ? "+" : ""}${d.score_change}`,
-      sub: d.score_change === null ? "Needs 2+ readings for a client" : `per bureau, across ${d.score_clients} ${d.score_clients === 1 ? "client" : "clients"}`,
+      sub: d.score_change === null ? "Needs 2+ readings for a client" : `per bureau and model, across ${d.score_clients} ${d.score_clients === 1 ? "client" : "clients"}`,
     },
     { label: "Letters awaiting reply", value: t.awaiting, sub: t.overdue ? `${t.overdue} past the 30-day deadline` : "None overdue", alert: t.overdue > 0 },
   ];
