@@ -57,7 +57,8 @@ export function mergeInto(keep: Item, dupes: Item[]) {
       uniqueStrings(group.map((i) => i.notes)).join("\n\n"),
       firstNonEmpty("creditor_address"),
       firstNonEmpty("original_creditor"),
-      firstNonEmpty("account_number"),
+      // Keep every distinct form: each bureau masks the number differently, and letters should quote the bureau's version.
+      uniqueStrings(group.flatMap((i) => i.account_number.split(" / "))).join(" / ").slice(0, 200),
       firstNonEmpty("balance"),
       firstNonEmpty("date_opened"),
       firstNonEmpty("date_of_first_delinquency"),
