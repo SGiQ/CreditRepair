@@ -49,9 +49,10 @@ export function applyAnalysis(reportId: number, clientId: number, analysis: Anal
       const freshId = insert(it);
       const fresh = getItems(clientId).find((i) => i.id === freshId)!;
       mergeInto(match, [{ ...fresh, status: match.status, notes: "" }]);
+      // The item keeps its original report: removing this newer report must not delete an account older reports show.
       run(
-        "UPDATE items SET report_id = ?, reported_status = ?, balance = CASE WHEN ? != '' THEN ? ELSE balance END WHERE id = ?",
-        reportId, it.reported_status, it.balance, it.balance, match.id,
+        "UPDATE items SET reported_status = ?, balance = CASE WHEN ? != '' THEN ? ELSE balance END WHERE id = ?",
+        it.reported_status, it.balance, it.balance, match.id,
       );
       if (reappeared) {
         run(
@@ -64,6 +65,12 @@ export function applyAnalysis(reportId: number, clientId: number, analysis: Anal
     const asOf = reportDate;
     for (const s of analysis.scores) {
       if (s.score < 300 || s.score > 850) continue;
+      // The same report uploaded twice shouldn't record the same reading twice.
+      const seen = get(
+        "SELECT 1 FROM scores WHERE client_id = ? AND bureau = ? AND score = ? AND as_of = ? AND lower(model) = lower(?)",
+        clientId, s.bureau, Math.round(s.score), asOf, s.model,
+      );
+      if (seen) continue;
       run(
         "INSERT INTO scores (client_id, report_id, bureau, score, model, as_of, source) VALUES (?, ?, ?, ?, ?, ?, 'report')",
         clientId, reportId, s.bureau, Math.round(s.score), s.model, asOf,

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { get, run } from "@/lib/db";
 import { bad, ok, idOf, type Ctx } from "@/lib/http";
 
-/** Removes the report, its stored file, and the items found in it that have no letters yet. */
+/** Removes the report, its stored file, the scores read from it, and the items found in it that have no letters yet. */
 export async function DELETE(_: Request, ctx: Ctx) {
   const auth = await requireAdmin();
   if (auth instanceof Response) return auth;
@@ -16,6 +16,7 @@ export async function DELETE(_: Request, ctx: Ctx) {
        AND NOT EXISTS (SELECT 1 FROM letters l, json_each(l.item_ids) j WHERE j.value = items.id)`,
     id,
   );
+  run("DELETE FROM scores WHERE report_id = ? AND source = 'report'", id);
   run("DELETE FROM reports WHERE id = ?", id);
   return ok();
 }
