@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { currentStep, type KeyDate, type Step } from "@/lib/steps";
 import { Button } from "./ui";
 
@@ -12,15 +12,24 @@ export function ProgressSidebar({
   steps,
   dates,
   onAction,
+  doneLabel = "Every step is complete. 🎉",
+  children,
 }: {
   title: string;
   steps: Step[];
   dates: KeyDate[];
   onAction: (step: Step) => void;
+  /** Shown in place of "Next up" once every required step is done. */
+  doneLabel?: ReactNode;
+  /** Extra content under the key dates (e.g. today's priorities on the dashboard). */
+  children?: ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const current = currentStep(steps);
-  const counted = steps.filter((s) => !s.skipped);
+  // Required steps first; optional ones are only suggested after those are done.
+  const required = currentStep(steps.filter((s) => !s.optional));
+  const current =
+    required !== -1 ? steps.indexOf(steps.filter((s) => !s.optional)[required]) : steps.findIndex((s) => s.optional && !s.done && !s.skipped);
+  const counted = steps.filter((s) => !s.skipped && !s.optional);
   const done = counted.filter((s) => s.done).length;
   const pct = counted.length ? Math.round((done / counted.length) * 100) : 0;
   const next = current === -1 ? null : steps[current];
@@ -39,7 +48,7 @@ export function ProgressSidebar({
 
       {next ? (
         <div className="mt-4 rounded-lg bg-emerald-50 p-3.5 ring-1 ring-emerald-200">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">{next.waiting ? "In progress" : "Next up"}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">{next.waiting ? "In progress" : next.optional ? "Optional next step" : "Next up"}</p>
           <p className="mt-1 font-semibold text-stone-900">{next.title}</p>
           <p className="mt-1 text-sm leading-relaxed text-stone-700">{next.detail}</p>
           {next.expect && (
@@ -55,9 +64,7 @@ export function ProgressSidebar({
           )}
         </div>
       ) : (
-        <p className="mt-4 rounded-lg bg-emerald-50 p-3.5 text-sm text-emerald-900 ring-1 ring-emerald-200">
-          Every step is complete. 🎉
-        </p>
+        <div className="mt-4 rounded-lg bg-emerald-50 p-3.5 text-sm text-emerald-900 ring-1 ring-emerald-200">{doneLabel}</div>
       )}
 
       {dates.length > 0 && (
@@ -73,6 +80,8 @@ export function ProgressSidebar({
         </dl>
       )}
 
+      {children}
+
       <button className="mt-4 text-sm font-medium text-emerald-700 hover:underline lg:hidden" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>
         {expanded ? "Hide all steps" : "Show all steps"}
       </button>
@@ -84,6 +93,7 @@ export function ProgressSidebar({
               <button
                 type="button"
                 disabled={!s.target || s.done}
+                title={!s.target && !s.done ? s.detail : undefined}
                 onClick={() => onAction(s)}
                 className={`flex w-full items-start gap-2.5 rounded-md px-2 py-1.5 text-left text-sm disabled:cursor-default ${isCurrent ? "bg-stone-100" : "enabled:hover:bg-stone-50"}`}
                 aria-current={isCurrent ? "step" : undefined}
@@ -99,6 +109,7 @@ export function ProgressSidebar({
                 <span className={s.done ? "text-stone-400 line-through decoration-stone-300" : isCurrent ? "font-medium text-stone-900" : "text-stone-600"}>
                   {s.title}
                   {s.skipped && <span className="ml-1 text-xs text-stone-400 no-underline">(skipped)</span>}
+                  {s.optional && !s.done && <span className="ml-1 text-xs text-stone-400">(optional)</span>}
                   <span className="sr-only">{s.done ? " — done" : isCurrent ? " — current step" : ""}</span>
                 </span>
               </button>

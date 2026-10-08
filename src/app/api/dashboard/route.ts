@@ -3,6 +3,12 @@ import { all, get } from "@/lib/db";
 import { ok } from "@/lib/http";
 import { scoreSeries } from "@/lib/scores";
 import type { Score } from "@/lib/types";
+import type { KeyDate, Step } from "@/lib/steps";
+import { hasApiKey } from "@/lib/agent";
+import { backupConfig } from "@/lib/backup";
+import { emailConfig } from "@/lib/email";
+import { mailConfig } from "@/lib/mail";
+import { paymentsConfig } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +74,114 @@ export async function GET() {
   }
   const scoreChange = changes.length ? Math.round(changes.reduce((sum, c) => sum + c.change, 0) / changes.length) : null;
 
+  // ---- Business setup checklist for the sidebar
+  const firstClient = get<{ id: number }>("SELECT id FROM clients ORDER BY id LIMIT 1");
+  const clientUrl = firstClient ? `/clients/${firstClient.id}` : "#clients";
+  const has = (sql: string) => Boolean(get(sql));
+  const email = emailConfig();
+  const backups = backupConfig();
+  const offsiteOk = has("SELECT 1 FROM backups WHERE status = 'ok' AND destination LIKE '%bucket%'");
+  const mail = mailConfig();
+  const pay = paymentsConfig();
+  const setup: Step[] = [
+    {
+      key: "ai",
+      title: "Connect the AI agent",
+      detail: "Add ANTHROPIC_API_KEY to the app's environment (Railway → Variables). Report analysis, letters and the advisor need it.",
+      done: hasApiKey(),
+    },
+    {
+      key: "email",
+      title: "Turn on email",
+      detail: "Set MAIL_FROM plus RESEND_API_KEY or SMTP_URL so invites, password resets, delivery notices and reminders can be sent.",
+      done: email.enabled && email.mode !== "demo",
+      target: "/admin",
+      cta: "Open email settings",
+    },
+    {
+      key: "backups",
+      title: "Back up off-site, encrypted",
+      detail: !backups.remote
+        ? "Add the R2/S3 bucket keys so nightly backups are copied off this server."
+        : !backups.encrypted
+          ? "Set BACKUP_PASSPHRASE so backups are encrypted. They contain client data."
+          : "Settings are in place. Run one backup to confirm it reaches the bucket.",
+      done: Boolean(backups.remote) && backups.encrypted && offsiteOk,
+      target: "/admin",
+      cta: backups.remote && backups.encrypted ? "Run a backup now" : "Open backup settings",
+      expect: "Backups run nightly after BACKUP_HOUR. A manual one takes a few seconds.",
+    },
+    {
+      key: "client",
+      title: "Add your first client",
+      detail: "Name, mailing address, date of birth and last 4 of SSN. These print on every letter.",
+      done: Boolean(firstClient),
+      target: "#clients",
+      cta: "Add a client",
+    },
+    {
+      key: "report",
+      title: "Upload a credit report",
+      detail: "Upload the client's report on their Overview. The agent lists every negative item with the laws and dispute angle.",
+      done: has("SELECT 1 FROM reports WHERE status = 'done'"),
+      target: clientUrl,
+      cta: "Go to the client",
+      expect: "Analysis takes about 2–5 minutes per report.",
+    },
+    {
+      key: "invite",
+      title: "Invite a client to their portal",
+      detail: "On the client's Overview, Client login → Create invite link. They can then upload reports, approve letters and follow progress.",
+      done: has("SELECT 1 FROM users WHERE role = 'client'"),
+      target: clientUrl,
+      cta: "Go to the client",
+    },
+    {
+      key: "letters",
+      title: "Draft your first letters",
+      detail: "Pick the items on the Negative items tab and draft round-one disputes.",
+      done: has("SELECT 1 FROM letters WHERE status IN ('draft', 'sent') AND type != 'freeze_request'"),
+      target: clientUrl,
+      cta: "Go to the client",
+    },
+    {
+      key: "lob",
+      title: "Connect certified mail (Lob)",
+      detail: "Add LOB_API_KEY so approved letters can be mailed from the app with tracking. Until then, letters are printed and mailed by hand.",
+      done: mail.mode === "live" || mail.mode === "test",
+      optional: true,
+    },
+    {
+      key: "paypal",
+      title: "Take mailing fees by PayPal",
+      detail: "Add the PayPal app keys and set a fee per letter on the Accounts page.",
+      done: pay.enabled && pay.mode !== "demo" && pay.feeCents > 0,
+      target: "/admin",
+      cta: "Open fee settings",
+      optional: true,
+    },
+  ];
+
+  // ---- Key numbers for the sidebar
+  const newLeads = get<{ n: number }>("SELECT COUNT(*) AS n FROM leads WHERE status = 'new'")?.n ?? 0;
+  const drafts = rows.reduce((s, r) => s + r.drafts, 0);
+  const dueSoon = rows.reduce((s, r) => s + r.due_soon, 0);
+  const overdue = rows.reduce((s, r) => s + r.overdue, 0);
+  const lastBackup = get<{ created_at: string }>("SELECT created_at FROM backups WHERE status = 'ok' ORDER BY id DESC LIMIT 1");
+  const keyDates: KeyDate[] = [];
+  if (overdue) keyDates.push({ label: "Replies overdue", value: String(overdue), tone: "red" });
+  if (dueSoon) keyDates.push({ label: "Replies due this week", value: String(dueSoon), tone: "amber" });
+  if (drafts) keyDates.push({ label: "Letters not yet mailed", value: String(drafts), tone: "amber" });
+  if (newLeads) keyDates.push({ label: "New inquiries", value: String(newLeads), tone: "amber" });
+  keyDates.push({
+    label: "Last backup",
+    value: lastBackup ? new Date(`${lastBackup.created_at.replace(" ", "T")}Z`).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Never",
+    tone: lastBackup ? undefined : "red",
+  });
+
   return ok({
+    setup,
+    key_dates: keyDates,
     score_change: scoreChange,
     score_clients: new Set(changes.map((c) => c.client_id)).size,
     totals: {

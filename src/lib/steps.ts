@@ -14,6 +14,8 @@ export interface Step {
   cta?: string;
   /** Plain-language note on timing and what happens next, shown for the current step. */
   expect?: string;
+  /** Nice to have: shown in the list, but not counted in the percentage and only suggested once required steps are done. */
+  optional?: boolean;
 }
 
 export interface KeyDate {

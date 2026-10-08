@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ClientForm } from "@/components/ClientForm";
+import { DashboardSidebar } from "@/components/DashboardSidebar";
 import { DashboardSummary } from "@/components/DashboardSummary";
 import { LeadsCard } from "@/components/LeadsCard";
 import { api, Badge, Button, Card } from "@/components/ui";
@@ -26,11 +27,13 @@ export function ClientsHome() {
         <p className="mt-1 text-sm text-stone-600">Every client&apos;s file at a glance, and what needs doing next.</p>
       </div>
 
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="min-w-0 space-y-6">
       <LeadsCard />
 
       <DashboardSummary />
 
-      <div className="flex items-end justify-between gap-4 pt-2">
+      <div id="clients" className="flex scroll-mt-6 items-end justify-between gap-4 pt-2">
         <h2 className="text-lg font-semibold tracking-tight">Clients</h2>
         {!adding && (
           <Button variant="primary" onClick={() => setAdding(true)}>
@@ -58,7 +61,7 @@ export function ClientsHome() {
         </Card>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {clients?.map((c) => {
           const pct = c.item_count ? Math.round((c.resolved_count / c.item_count) * 100) : 0;
           return (
@@ -82,6 +85,10 @@ export function ClientsHome() {
             </Link>
           );
         })}
+      </div>
+        </div>
+
+        <DashboardSidebar />
       </div>
     </div>
   );

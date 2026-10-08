@@ -40,7 +40,7 @@ export function DashboardSummary() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
         {tiles.map((tile) => (
           <Card key={tile.label} className="p-5">
             <div className="text-xs font-medium text-stone-500">{tile.label}</div>
@@ -53,7 +53,7 @@ export function DashboardSummary() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
+      <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
         <Card>
           <h2 className="px-5 pt-5 font-semibold">Needs attention</h2>
           {!d.attention.length && <p className="px-5 pb-5 pt-2 text-sm text-stone-500">All caught up. Nothing is overdue or waiting on you.</p>}
