@@ -61,6 +61,7 @@ export function adminSteps(b: ClientBundle): Step[] {
   const open = items.filter((i) => i.status !== "deleted" && i.status !== "updated");
   const verified = items.filter((i) => i.status === "verified").length;
   const frozen = freezes.some((f) => f.status !== "todo");
+  const plan = Boolean(b.plan?.data);
 
   return [
     {
@@ -92,8 +93,8 @@ export function adminSteps(b: ClientBundle): Step[] {
       title: "Review the negative items",
       detail: `${plural(items.length, "item")} found. Open each one to check the dispute angle, add anything ${first} has told you in the notes, and remove any that should not be disputed.`,
       done: items.length > 0 && (ds.length > 0 || items.some((i) => i.status !== "identified")),
-      target: "Negative items",
-      cta: "Review items",
+      target: plan ? "Plan" : "Negative items",
+      cta: plan ? "Open the dispute plan" : "Review items",
     },
     {
       key: "freeze",

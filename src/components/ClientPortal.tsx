@@ -4,6 +4,7 @@ import { clientSteps, keyDates } from "@/lib/steps";
 import { BUREAUS, CATEGORY_LABEL, LETTER_TYPES, STATUS_LABEL, canMail, CFPB_URL, type ClientBundle, type ItemStatus, type Letter } from "@/lib/types";
 import { STATUS_TONE } from "./ItemsTab";
 import { ClientFreezes } from "./ClientFreezes";
+import { PlanReport } from "./PlanView";
 import { ReportUpload } from "./ReportUpload";
 import { ScoreCard } from "./ScoreCard";
 import { SignatureCard } from "./SignatureCard";
@@ -94,6 +95,13 @@ export function ClientPortal({ id }: { id: number }) {
       </Card>
 
       <ScoreCard clientId={client.id} scores={bundle.scores} reload={reload} role="client" />
+
+      {bundle.plan?.data && (
+        <section id="plan" className="scroll-mt-6 space-y-3">
+          <h2 className="text-lg font-semibold tracking-tight">Your dispute plan</h2>
+          <PlanReport plan={bundle.plan} items={items} clientId={client.id} role="client" reload={reload} />
+        </section>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-2">
         <div id="reports" className="scroll-mt-6">

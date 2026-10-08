@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/auth";
 import { chatStream, friendlyError, hasApiKey } from "@/lib/agent";
 import { bad, idOf, NO_KEY, type Ctx } from "@/lib/http";
+import { getPlan } from "@/lib/plan";
 import { getClient, getItems, getLetters } from "@/lib/store";
 
 export async function POST(req: Request, ctx: Ctx) {
@@ -13,7 +14,7 @@ export async function POST(req: Request, ctx: Ctx) {
   const { messages } = await req.json();
   if (!Array.isArray(messages) || !messages.length) return bad("No message.");
 
-  const stream = chatStream({ client, items: getItems(id), letters: getLetters(id), messages });
+  const stream = chatStream({ client, items: getItems(id), letters: getLetters(id), plan: getPlan(id)?.data ?? null, messages });
   const enc = new TextEncoder();
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {

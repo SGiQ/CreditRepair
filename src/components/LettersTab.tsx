@@ -7,10 +7,11 @@ import { api, Badge, Button, Card, ErrorNote, Field, fmtDate, inputClass, linkBu
 
 type DraftType = Exclude<LetterType, "freeze_request">;
 const DRAFT_TYPES = (Object.keys(LETTER_TYPES) as LetterType[]).filter((t): t is DraftType => t !== "freeze_request");
-const STAGES = ["Dispute", "Follow-up", "Escalation", "Affidavit"];
+const STAGES = ["Dispute", "Goodwill", "Follow-up", "Escalation", "Affidavit"];
 
 /** Which open items each letter type is normally written about. */
 const DEFAULT_PICK: Record<DraftType, (i: Item) => boolean> = {
+  goodwill: (i) => i.strength === "weak" && i.category !== "inquiry" && i.category !== "personal_info",
   bureau_dispute: (i) => !["inquiry", "personal_info"].includes(i.category) && ["identified", "disputed"].includes(i.status),
   debt_validation: (i) => i.category === "collection",
   furnisher_dispute: (i) => ["charge_off", "late_payment", "repossession", "foreclosure"].includes(i.category),

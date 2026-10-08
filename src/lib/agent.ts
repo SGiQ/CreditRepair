@@ -2,8 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import fs from "node:fs";
-import type { Client, Item, Letter, LetterType } from "./types";
-import { LETTER_TYPES } from "./types";
+import type { Client, Item, Letter, LetterType, PlanData } from "./types";
+import { LETTER_TYPES, PLAN_LETTER_TYPES } from "./types";
 
 export const MODEL = process.env.CLAUDE_MODEL || "claude-opus-5-5";
 export const hasApiKey = () => Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
@@ -180,6 +180,8 @@ const LetterSchema = z.object({
 export type DraftedLetter = z.infer<typeof LetterSchema>;
 
 const LETTER_BRIEF: Record<Exclude<LetterType, "freeze_request">, string> = {
+  goodwill:
+    "A courteous goodwill letter to the creditor asking it to remove the negative reporting on an account that is accurately reported. Do not claim the information is inaccurate and do not cite laws or make demands. Acknowledge the account, briefly explain any circumstances given in the specialist notes (use a bracketed placeholder such as [brief reason for the late payments] if none are given), and point to positive history such as on-time payments since or payoff. If the account still has a balance, offer to pay it in full in exchange for removing the negative entries (pay-for-delete) and ask for that agreement in writing before payment. Polite, sincere, and short.",
   bureau_dispute:
     "A first-round dispute to the credit bureau under FCRA §611. List each disputed account (creditor, masked account number), state precisely what is inaccurate, incomplete, or unverified about it, and request reinvestigation and deletion or correction, with an updated report sent on completion.",
   debt_validation:
@@ -279,6 +281,7 @@ export function chatStream(args: {
   client: Client;
   items: Item[];
   letters: Letter[];
+  plan?: PlanData | null;
   messages: { role: "user" | "assistant"; content: string }[];
 }) {
   const file = {
@@ -298,6 +301,7 @@ export function chatStream(args: {
       tracking_status: i.status,
       notes: i.notes,
     })),
+    dispute_plan: args.plan ? { overview: args.plan.overview, tiers: args.plan.tiers, rounds: args.plan.rounds.map((r) => ({ round: r.round, title: r.title, actions: r.actions })), cautions: args.plan.cautions } : null,
     letters: args.letters.map((l) => ({
       type: LETTER_TYPES[l.type]?.label ?? l.type,
       recipient: l.recipient_name,
@@ -352,4 +356,102 @@ ${JSON.stringify(items)}
   const msg = await stream.finalMessage();
   checkStop(msg);
   return DuplicateSchema.parse(msg.parsed_output ?? JSON.parse(textOf(msg))).groups;
+}
+
+const PlanSchema = z.object({
+  overview: z.string().describe("3-5 plain-language sentences for the client: where the file stands and the overall approach"),
+  tiers: z
+    .array(
+      z.object({
+        item_id: z.number(),
+        tier: z.enum(["best", "partial", "low"]),
+        headline: z.string().describe("Short plain label, e.g. \"Wrong name on Experian\""),
+        why: z.string().describe("1-2 plain-language sentences on why it falls in this tier"),
+        outcome: z.string().describe("Realistic expected result, e.g. \"Likely removed\" or \"History corrected; charge-off stays until ~2031\""),
+      }),
+    )
+    .describe("Exactly one entry per open item"),
+  rounds: z.array(
+    z.object({
+      round: z.number(),
+      title: z.string(),
+      timing: z.string().describe("When this round happens, e.g. \"Now\" or \"After Round 1 results, about 45 days\""),
+      actions: z.array(
+        z.object({
+          letter_type: z.enum(PLAN_LETTER_TYPES),
+          item_ids: z.array(z.number()),
+          bureaus: z.array(z.enum(["Equifax", "Experian", "TransUnion"])).describe("For letters to credit bureaus, which bureaus; empty for letters to creditors or collectors"),
+          note: z.string().describe("One line for the specialist on what this letter argues"),
+        }),
+      ),
+    }),
+  ),
+  expect: z.array(z.object({ title: z.string(), detail: z.string() })).describe("What to expect: timeline and realistic outcomes, 3-6 entries, plain language"),
+  questions: z
+    .array(z.object({ question: z.string().describe("Asked directly to the client"), why: z.string(), item_ids: z.array(z.number()) }))
+    .describe("Facts to confirm with the client before disputing; empty if none"),
+  cautions: z.array(z.string()).describe("Important cautions, e.g. accounts currently past due, disputing a mortgage during a refinance; empty if none"),
+});
+
+export async function generatePlan(input: {
+  goal: string;
+  items: Item[];
+  letters: Letter[];
+  answers: { question: string; answer: string }[];
+}): Promise<PlanData> {
+  const file = {
+    today: new Date().toISOString().slice(0, 10),
+    client_goal: input.goal || "Not stated",
+    open_items: input.items
+      .filter((i) => i.status !== "deleted" && i.status !== "updated")
+      .map((i) => ({
+        id: i.id,
+        creditor: i.creditor,
+        account_number: i.account_number,
+        category: i.category,
+        bureaus: i.bureaus,
+        balance: i.balance,
+        reported_status: i.reported_status,
+        issues: i.issues,
+        laws: i.laws.map((l) => l.citation),
+        dispute_angle: i.dispute_angle,
+        analysis_strength: i.strength,
+        tracking_status: i.status,
+        identity_theft_flagged: i.identity_theft,
+        specialist_notes: i.notes,
+      })),
+    resolved_items: input.items.filter((i) => i.status === "deleted" || i.status === "updated").map((i) => ({ id: i.id, creditor: i.creditor, status: i.status })),
+    letters: input.letters
+      .filter((l) => l.status === "draft" || l.status === "sent")
+      .map((l) => ({ type: l.type, recipient: l.recipient_name, round: l.round, status: l.status, sent_on: l.sent_at, outcome: l.response, item_ids: l.item_ids })),
+    client_answers: input.answers,
+  };
+  const stream = client().messages.stream({
+    model: MODEL,
+    max_tokens: 32000,
+    output_config: { effort: "high", format: zodOutputFormat(PlanSchema) },
+    system: SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: `Build a dispute plan for this client's file. The client will read most of it, so write the overview, headlines, reasons, outcomes, what-to-expect entries and questions in plain language, without legal jargon.
+
+How to plan:
+- Put every open item in exactly one tier: "best" (specific, provable inaccuracies likely to be removed or fixed), "partial" (errors that can be corrected though the negative item itself is likely accurate and will stay), or "low" (accurately reported: do not dispute; say what the realistic route is instead, such as goodwill, payment, or waiting for it to age off, with the date if known).
+- Round 1 should hold the strongest, best-documented disputes, plus debt validation for collections, plus personal-information cleanup. Hold weaker or dependent disputes for later rounds that build on Round 1 results. Use a goodwill letter_type for accurate items worth a goodwill or pay-for-delete request, never a dispute.
+- A letter to a bureau may only include items that bureau reports. Group items into as few letters as sensible: one bureau_dispute action can cover several items and several bureaus.
+- Do not schedule disputes that depend on facts the client has not confirmed (for example "not my address"); ask about them under questions, and use the client's answers below if they exist.
+- Never suggest disputing information the client has confirmed is accurate, and never suggest identity theft unless an item is flagged for it.
+- Account for the client's goal and timing, such as an upcoming mortgage application, and for accounts that are currently past due. Note in cautions anything that should be handled before or alongside disputes.
+- Be honest about likelihood. Do not promise results.
+
+<file>
+${JSON.stringify(file, null, 2)}
+</file>`,
+      },
+    ],
+  });
+  const msg = await stream.finalMessage();
+  checkStop(msg);
+  return PlanSchema.parse(msg.parsed_output ?? JSON.parse(textOf(msg))) as PlanData;
 }

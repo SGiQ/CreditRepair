@@ -4,6 +4,7 @@ import { hasApiKey } from "./agent";
 import { emailConfig } from "./email";
 import { mailConfig, refreshStaleTracking } from "./mail";
 import { paymentsConfig, provider } from "./payments";
+import { getPlan } from "./plan";
 
 type Raw = Record<string, unknown>;
 const j = <T>(v: unknown, fallback: T): T => {
@@ -45,6 +46,9 @@ function expireStaleJobs() {
   run(
     "UPDATE letters SET status = 'error', error = 'Drafting was interrupted. Generate it again.' WHERE status = 'generating' AND created_at < datetime('now', '-15 minutes')",
   );
+  run(
+    "UPDATE plans SET status = 'error', error = 'Building the plan was interrupted. Try again.' WHERE status = 'generating' AND created_at < datetime('now', '-20 minutes')",
+  );
 }
 
 function portalAccess(clientId: number): PortalAccess {
@@ -82,6 +86,7 @@ export function getBundle(id: number, role: "admin" | "client" = "admin"): Clien
       items: getItems(id).map((i) => ({ ...i, notes: "" })),
       letters: getLetters(id).filter((l) => l.status === "draft" || l.status === "sent"),
       scores,
+      plan: clientPlan(id),
       // Clients see their freeze statuses and whether a letter is on file, never the letter itself.
       freezes: all<Freeze>("SELECT agency, status, confirmed_on, confirmation_number, doc_name, added_by FROM freezes WHERE client_id = ?", id),
       hasApiKey: true,
@@ -103,6 +108,7 @@ export function getBundle(id: number, role: "admin" | "client" = "admin"): Clien
     items: getItems(id),
     letters: getLetters(id),
     scores,
+    plan: getPlan(id),
     freezes: all<Freeze>("SELECT agency, status, confirmed_on, confirmation_number, doc_name, added_by FROM freezes WHERE client_id = ?", id),
     hasApiKey: hasApiKey(),
   };
@@ -132,4 +138,16 @@ export async function settleLetterPayment(letter: Letter): Promise<"paid" | "pen
     return "failed";
   }
   return "pending";
+}
+
+/** The client's view: the latest finished plan (even while a refresh runs), without the specialist's letter notes. */
+function clientPlan(clientId: number) {
+  const p = getPlan(clientId);
+  if (!p?.data) return null;
+  return {
+    ...p,
+    status: "done" as const,
+    error: "",
+    data: { ...p.data, rounds: p.data.rounds.map((r) => ({ ...r, actions: r.actions.map((a) => ({ ...a, note: "" })) })) },
+  };
 }

@@ -128,6 +128,16 @@ CREATE TABLE IF NOT EXISTS backups (
   error TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS plans (
+  client_id INTEGER PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'generating',
+  error TEXT NOT NULL DEFAULT '',
+  goal TEXT NOT NULL DEFAULT '',
+  data TEXT NOT NULL DEFAULT '',
+  answers TEXT NOT NULL DEFAULT '{}',
+  drafted_rounds TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS leads (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,

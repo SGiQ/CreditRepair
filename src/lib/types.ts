@@ -136,6 +136,12 @@ export const LETTER_TYPES = {
     stage: "Follow-up",
     desc: "FCRA §611(a)(1)(A) deletion demand when the bureau misses its deadline.",
   },
+  goodwill: {
+    label: "Goodwill / pay-for-delete request",
+    to: "furnisher",
+    stage: "Goodwill",
+    desc: "Courteous request asking the creditor to remove accurate negative reporting, optionally offering payment in exchange for deletion.",
+  },
   final_notice: {
     label: "Final notice before legal action",
     to: "either",
@@ -201,7 +207,8 @@ export interface Letter {
 }
 
 /** Mailed disputes start a 30-day reply clock; freeze requests and CFPB filings are tracked without one. */
-export const hasReplyClock = (type: LetterType) => type !== "freeze_request" && type !== "cfpb_complaint";
+// Goodwill requests carry no legal reply deadline, so they never count as overdue.
+export const hasReplyClock = (type: LetterType) => type !== "freeze_request" && type !== "cfpb_complaint" && type !== "goodwill";
 
 export const CFPB_URL = "https://www.consumerfinance.gov/complaint/";
 
@@ -277,7 +284,57 @@ export interface PortalAccess {
   email: string;
 }
 
+export type PlanTier = "best" | "partial" | "low";
+
+export const TIER_LABEL: Record<PlanTier, string> = {
+  best: "Best chances",
+  partial: "Likely corrected, not removed",
+  low: "Low chance: other routes",
+};
+
+/** Letter types the plan may schedule (CFPB complaints and ID-theft affidavits need a human decision first). */
+export const PLAN_LETTER_TYPES = [
+  "bureau_dispute",
+  "debt_validation",
+  "furnisher_dispute",
+  "inquiry_removal",
+  "personal_info",
+  "method_of_verification",
+  "no_response",
+  "final_notice",
+  "goodwill",
+] as const;
+export type PlanLetterType = (typeof PLAN_LETTER_TYPES)[number];
+
+export interface PlanData {
+  overview: string;
+  tiers: { item_id: number; tier: PlanTier; headline: string; why: string; outcome: string }[];
+  rounds: {
+    round: number;
+    title: string;
+    timing: string;
+    actions: { letter_type: PlanLetterType; item_ids: number[]; bureaus: Bureau[]; note: string }[];
+  }[];
+  expect: { title: string; detail: string }[];
+  questions: { question: string; why: string; item_ids: number[] }[];
+  cautions: string[];
+}
+
+export interface Plan {
+  status: "generating" | "done" | "error";
+  error: string;
+  goal: string;
+  created_at: string;
+  data: PlanData | null;
+  /** Client's (or specialist's) answers, keyed by question index. */
+  answers: Record<string, string>;
+  drafted_rounds: number[];
+  /** The file changed after this plan was made. */
+  stale: boolean;
+}
+
 export interface ClientBundle {
+  plan: Plan | null;
   client: Client;
   access?: PortalAccess;
   /** `image` is only included for the client's own login. */

@@ -8,10 +8,11 @@ import { FreezesTab } from "./FreezesTab";
 import { ItemsTab } from "./ItemsTab";
 import { LettersTab } from "./LettersTab";
 import { OverviewTab } from "./OverviewTab";
+import { PlanTab } from "./PlanTab";
 import { ProgressSidebar } from "./ProgressSidebar";
 import { api, ErrorNote } from "./ui";
 
-const TABS = ["Overview", "Negative items", "Letters", "Freezes", "Advisor"] as const;
+const TABS = ["Overview", "Plan", "Negative items", "Letters", "Freezes", "Advisor"] as const;
 type Tab = (typeof TABS)[number];
 
 export interface TabProps {
@@ -43,6 +44,7 @@ export function ClientWorkspace({ id }: { id: number }) {
   // Poll while background work is running; in mail demo mode also while simulated mail is "in transit".
   const working =
     bundle?.reports.some((r) => r.status === "analyzing") ||
+    bundle?.plan?.status === "generating" ||
     bundle?.letters.some((l) => l.status === "generating" || (bundle.mail.mode === "demo" && l.mail_id && l.status === "sent" && !l.delivered_at));
   useEffect(() => {
     if (!working) return;
@@ -92,6 +94,7 @@ export function ClientWorkspace({ id }: { id: number }) {
       </nav>
 
       {tab === "Overview" && <OverviewTab {...props} goTo={(t) => setTab(t as Tab)} />}
+      {tab === "Plan" && <PlanTab {...props} />}
       {tab === "Negative items" && (
         <ItemsTab
           {...props}
