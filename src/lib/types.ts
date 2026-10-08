@@ -260,6 +260,8 @@ export interface Freeze {
   confirmation_number: string;
   /** Original filename of the uploaded confirmation letter; "" when none. The stored path never leaves the server. */
   doc_name: string;
+  /** "client" when the client uploaded the confirmation from their portal. */
+  added_by: string;
 }
 
 export interface SessionUser {

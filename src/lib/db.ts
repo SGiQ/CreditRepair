@@ -170,6 +170,7 @@ const COLUMNS: [table: string, column: string, ddl: string][] = [
   ["freezes", "confirmation_number", "TEXT NOT NULL DEFAULT ''"],
   ["freezes", "doc_path", "TEXT NOT NULL DEFAULT ''"],
   ["freezes", "doc_name", "TEXT NOT NULL DEFAULT ''"],
+  ["freezes", "added_by", "TEXT NOT NULL DEFAULT ''"],
   ["clients", "report_reminded_at", "TEXT NOT NULL DEFAULT ''"],
   ["letters", "delivery_choice", "TEXT NOT NULL DEFAULT ''"],
   ["letters", "payment_status", "TEXT NOT NULL DEFAULT ''"],

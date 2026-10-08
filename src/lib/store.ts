@@ -82,7 +82,8 @@ export function getBundle(id: number, role: "admin" | "client" = "admin"): Clien
       items: getItems(id).map((i) => ({ ...i, notes: "" })),
       letters: getLetters(id).filter((l) => l.status === "draft" || l.status === "sent"),
       scores,
-      freezes: [],
+      // Clients see their freeze statuses and whether a letter is on file, never the letter itself.
+      freezes: all<Freeze>("SELECT agency, status, confirmed_on, confirmation_number, doc_name, added_by FROM freezes WHERE client_id = ?", id),
       hasApiKey: true,
     };
   }
@@ -102,7 +103,7 @@ export function getBundle(id: number, role: "admin" | "client" = "admin"): Clien
     items: getItems(id),
     letters: getLetters(id),
     scores,
-    freezes: all<Freeze>("SELECT agency, status, confirmed_on, confirmation_number, doc_name FROM freezes WHERE client_id = ?", id),
+    freezes: all<Freeze>("SELECT agency, status, confirmed_on, confirmation_number, doc_name, added_by FROM freezes WHERE client_id = ?", id),
     hasApiKey: hasApiKey(),
   };
 }

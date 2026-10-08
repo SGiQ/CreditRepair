@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { clientSteps, keyDates } from "@/lib/steps";
 import { BUREAUS, CATEGORY_LABEL, LETTER_TYPES, STATUS_LABEL, canMail, CFPB_URL, type ClientBundle, type ItemStatus, type Letter } from "@/lib/types";
 import { STATUS_TONE } from "./ItemsTab";
+import { ClientFreezes } from "./ClientFreezes";
 import { ReportUpload } from "./ReportUpload";
 import { ScoreCard } from "./ScoreCard";
 import { SignatureCard } from "./SignatureCard";
@@ -128,6 +129,8 @@ export function ClientPortal({ id }: { id: number }) {
       </div>
 
       {bundle.mail.enabled && <SignatureCard bundle={bundle} reload={reload} />}
+
+      <ClientFreezes clientId={client.id} freezes={bundle.freezes} reload={reload} />
 
       <Card>
         <h2 className="px-5 pt-5 font-semibold">Accounts we&apos;re working on</h2>

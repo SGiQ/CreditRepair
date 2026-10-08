@@ -1,5 +1,7 @@
 import { get, run } from "./db";
-import { analyzeReport, draftLetter, friendlyError } from "./agent";
+import { analyzeReport, draftLetter, friendlyError, type Analysis } from "./agent";
+import { sameAccount } from "./dedupe";
+import { knownItems, mergeInto } from "./merge";
 import { BUREAU_ADDRESS, SECONDARY_AGENCIES } from "./agencies";
 import { getClient, getItems, getLetters } from "./store";
 import type { Bureau, Client, Item, LetterType } from "./types";
@@ -8,32 +10,58 @@ import { BUREAUS, LETTER_TYPES } from "./types";
 /** Runs after the upload response is sent; the UI polls for the result. */
 export async function runAnalysis(reportId: number, clientId: number, filePath: string, filename: string) {
   try {
-    const analysis = await analyzeReport(filePath, filename);
-    for (const it of analysis.items) {
-      run(
-        `INSERT INTO items (client_id, report_id, creditor, creditor_address, original_creditor, account_number, category, bureaus,
-           balance, date_opened, date_of_first_delinquency, reported_status, issues, laws, dispute_angle, next_steps, strength)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        clientId,
-        reportId,
-        it.creditor,
-        it.creditor_address,
-        it.original_creditor,
-        it.account_number,
-        it.category,
-        JSON.stringify(it.bureaus),
-        it.balance,
-        it.date_opened,
-        it.date_of_first_delinquency,
-        it.reported_status,
-        JSON.stringify(it.issues),
-        JSON.stringify(it.laws),
-        it.dispute_angle,
-        JSON.stringify(it.next_steps),
-        it.strength,
+    const analysis = await analyzeReport(filePath, filename, knownItems(clientId));
+    applyAnalysis(reportId, clientId, analysis);
+  } catch (e) {
+    console.error("analysis failed", e);
+    run("UPDATE reports SET status = 'error', error = ? WHERE id = ?", friendlyError(e), reportId);
+  }
+}
+
+/** Stores an analysis: new accounts are added, accounts already in the file are updated in place. */
+export function applyAnalysis(reportId: number, clientId: number, analysis: Analysis) {
+  {
+    const reportDate = /^\d{4}-\d{2}-\d{2}$/.test(analysis.report_date) ? analysis.report_date : new Date().toISOString().slice(0, 10);
+    const insert = (it: (typeof analysis.items)[number]) =>
+      Number(
+        run(
+          `INSERT INTO items (client_id, report_id, creditor, creditor_address, original_creditor, account_number, category, bureaus,
+             balance, date_opened, date_of_first_delinquency, reported_status, issues, laws, dispute_angle, next_steps, strength)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          clientId, reportId, it.creditor, it.creditor_address, it.original_creditor, it.account_number, it.category,
+          JSON.stringify(it.bureaus), it.balance, it.date_opened, it.date_of_first_delinquency, it.reported_status,
+          JSON.stringify(it.issues), JSON.stringify(it.laws), it.dispute_angle, JSON.stringify(it.next_steps), it.strength,
+        ).lastInsertRowid,
       );
+
+    for (const it of analysis.items) {
+      // The agent's match first; the rule-based check catches what it misses.
+      const current = getItems(clientId);
+      const match =
+        current.find((i) => i.id === it.same_as_item_id && i.category === it.category) ??
+        current.find((i) => i.report_id !== reportId && sameAccount(i, it));
+      if (!match) {
+        insert(it);
+        continue;
+      }
+      // Same account seen again: refresh what the new report says, keep the specialist's work.
+      const reappeared = match.status === "deleted" || match.status === "updated";
+      const freshId = insert(it);
+      const fresh = getItems(clientId).find((i) => i.id === freshId)!;
+      mergeInto(match, [{ ...fresh, status: match.status, notes: "" }]);
+      run(
+        "UPDATE items SET report_id = ?, reported_status = ?, balance = CASE WHEN ? != '' THEN ? ELSE balance END WHERE id = ?",
+        reportId, it.reported_status, it.balance, it.balance, match.id,
+      );
+      if (reappeared) {
+        run(
+          "UPDATE items SET status = 'identified', notes = TRIM(notes || ?) WHERE id = ?",
+          `\n\nReappeared on the report dated ${reportDate} after being marked ${match.status}. Check for reinsertion: a bureau must notify the consumer in writing within 5 business days of reinserting deleted information (FCRA §611(a)(5)(B)).`,
+          match.id,
+        );
+      }
     }
-    const asOf = /^\d{4}-\d{2}-\d{2}$/.test(analysis.report_date) ? analysis.report_date : new Date().toISOString().slice(0, 10);
+    const asOf = reportDate;
     for (const s of analysis.scores) {
       if (s.score < 300 || s.score > 850) continue;
       run(
@@ -42,9 +70,6 @@ export async function runAnalysis(reportId: number, clientId: number, filePath: 
       );
     }
     run("UPDATE reports SET status = 'done', summary = ? WHERE id = ?", analysis.summary, reportId);
-  } catch (e) {
-    console.error("analysis failed", e);
-    run("UPDATE reports SET status = 'error', error = ? WHERE id = ?", friendlyError(e), reportId);
   }
 }
 

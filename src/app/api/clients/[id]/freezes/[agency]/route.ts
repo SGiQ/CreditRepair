@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { requireAdmin } from "@/lib/auth";
-import { get, run, UPLOAD_DIR } from "@/lib/db";
+import { requireAdmin, requireClientAccess } from "@/lib/auth";
+import { sendEmail } from "@/lib/email";
+import { all, get, run, UPLOAD_DIR } from "@/lib/db";
 import { bad, ok } from "@/lib/http";
 import { SECONDARY_AGENCIES } from "@/lib/agencies";
 import { getClient } from "@/lib/store";
@@ -10,15 +11,16 @@ type Ctx = { params: Promise<{ id: string; agency: string }> };
 const MAX_BYTES = 15 * 1024 * 1024;
 const TYPES: Record<string, string> = { ".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg" };
 
-// Confirmation letters usually print the freeze PIN, so they're admin-only: never shown in the client portal.
-async function target(ctx: Ctx) {
-  const auth = await requireAdmin();
-  if (auth instanceof Response) return auth;
+// Confirmation letters usually print the freeze PIN. Clients may upload their own, but viewing and removing
+// stored letters is admin-only, so a letter is never shown in the client portal.
+async function target(ctx: Ctx, allowClient = false) {
   const { id, agency } = await ctx.params;
   const clientId = Number(id);
+  const auth = allowClient ? await requireClientAccess(clientId) : await requireAdmin();
+  if (auth instanceof Response) return auth;
   if (!getClient(clientId)) return bad("Client not found", 404);
   if (!SECONDARY_AGENCIES.some((a) => a.key === agency)) return bad("Unknown agency", 404);
-  return { clientId, agency };
+  return { clientId, agency, role: auth.role };
 }
 
 const current = (clientId: number, agency: string) =>
@@ -26,7 +28,7 @@ const current = (clientId: number, agency: string) =>
 
 /** Records a freeze confirmation (date, number, optional letter) and marks the agency frozen. */
 export async function POST(req: Request, ctx: Ctx) {
-  const t = await target(ctx);
+  const t = await target(ctx, true);
   if (t instanceof Response) return t;
   const form = await req.formData();
   const confirmedOn = String(form.get("confirmed_on") ?? "").trim();
@@ -48,17 +50,28 @@ export async function POST(req: Request, ctx: Ctx) {
 
   const prev = current(t.clientId, t.agency);
   run(
-    `INSERT INTO freezes (client_id, agency, status, confirmed_on, confirmation_number, doc_path, doc_name)
-     VALUES (?, ?, 'frozen', ?, ?, ?, ?)
+    `INSERT INTO freezes (client_id, agency, status, confirmed_on, confirmation_number, doc_path, doc_name, added_by)
+     VALUES (?, ?, 'frozen', ?, ?, ?, ?, ?)
      ON CONFLICT (client_id, agency) DO UPDATE SET
        status = 'frozen', confirmed_on = excluded.confirmed_on, confirmation_number = excluded.confirmation_number,
+       added_by = excluded.added_by,
        doc_path = CASE WHEN ? THEN excluded.doc_path ELSE freezes.doc_path END,
        doc_name = CASE WHEN ? THEN excluded.doc_name ELSE freezes.doc_name END,
        updated_at = datetime('now')`,
-    t.clientId, t.agency, confirmedOn, number, docPath ?? "", docName, docPath ? 1 : 0, docPath ? 1 : 0,
+    t.clientId, t.agency, confirmedOn, number, docPath ?? "", docName, t.role === "client" ? "client" : "", docPath ? 1 : 0, docPath ? 1 : 0,
   );
   // A new letter replaces the old one on disk.
   if (docPath && prev?.doc_path && prev.doc_path !== docPath) fs.rmSync(prev.doc_path, { force: true });
+
+  // Let the specialists know a client recorded a freeze themselves.
+  if (t.role === "client") {
+    const client = getClient(t.clientId)!;
+    const agencyName = SECONDARY_AGENCIES.find((a) => a.key === t.agency)!.name;
+    const text = `${client.name} recorded a ${agencyName} security freeze, placed on ${confirmedOn}${number ? ` (confirmation # ${number})` : ""}.${docPath ? " The confirmation letter is attached to their file." : ""}\n\nSee it on the client's Freezes tab.`;
+    for (const admin of all<{ email: string }>("SELECT email FROM users WHERE role = 'admin'")) {
+      void sendEmail({ clientId: t.clientId, letterId: null, kind: "freeze_confirmation", to: admin.email, subject: `${client.name}: ${agencyName} freeze confirmed`, text, html: `<p>${text.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!).replace(/\n\n/g, "</p><p>")}</p>` });
+    }
+  }
   return ok();
 }
 

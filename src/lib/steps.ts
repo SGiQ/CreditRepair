@@ -1,3 +1,4 @@
+import { SECONDARY_AGENCIES } from "./agencies";
 import { canMail, hasReplyClock, type ClientBundle, type Letter } from "./types";
 
 export interface Step {
@@ -220,6 +221,16 @@ export function clientSteps(b: ClientBundle): Step[] {
       waiting: b.mail.enabled && drafts.length > 0 && !unapproved.length,
       target: b.mail.enabled && !b.signature.onFile ? "signature" : "letters",
       cta: b.mail.enabled && !b.signature.onFile ? "Add your signature" : "Go to your letters",
+    },
+    {
+      key: "freezes",
+      expect: "Online freezes take a few minutes each. Some agencies ask for a mailed request instead; your specialist can prepare it.",
+      title: "Freeze the smaller credit agencies",
+      detail: "Freeze LexisNexis, Innovis, ChexSystems and the others listed under Security freezes, then record each confirmation there.",
+      done: SECONDARY_AGENCIES.every((a) => b.freezes.find((f) => f.agency === a.key)?.status === "frozen"),
+      target: "freezes",
+      cta: "Go to security freezes",
+      optional: true,
     },
     // Only appears once the specialist has escalated and written a complaint for them to file.
     ...(b.letters.some((l) => l.type === "cfpb_complaint")

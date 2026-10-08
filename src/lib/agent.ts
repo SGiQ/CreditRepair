@@ -36,6 +36,10 @@ How you work:
 - You provide information and drafting support, not legal advice. Suggest a consumer protection attorney when a clear statutory violation with damages appears.`;
 
 const ItemSchema = z.object({
+  same_as_item_id: z
+    .number()
+    .nullable()
+    .describe("If this account or record is already in the client's file (the list provided), that item's id; otherwise null"),
   creditor: z.string().describe("Name of the furnisher / collector / inquirer as shown on the report"),
   creditor_address: z.string().describe("Mailing address if shown on the report, lines separated by \\n; empty string if not shown"),
   original_creditor: z.string().describe("Original creditor for collections / sold debts; empty if not applicable"),
@@ -111,7 +115,20 @@ const SYSTEM: Anthropic.TextBlockParam[] = [
   { type: "text", text: EXPERT_SYSTEM, cache_control: { type: "ephemeral" } },
 ];
 
-export async function analyzeReport(filePath: string, filename: string): Promise<Analysis> {
+/** What the agent sees of the client's file, so a re-uploaded or combined report updates items instead of duplicating them. */
+export interface KnownItem {
+  id: number;
+  creditor: string;
+  original_creditor: string;
+  account_number: string;
+  category: string;
+  bureaus: string[];
+  balance: string;
+  date_opened: string;
+  reported_status: string;
+}
+
+export async function analyzeReport(filePath: string, filename: string, known: KnownItem[] = []): Promise<Analysis> {
   const isPdf = filename.toLowerCase().endsWith(".pdf");
   const doc: Anthropic.ContentBlockParam = isPdf
     ? {
@@ -134,7 +151,17 @@ export async function analyzeReport(filePath: string, filename: string): Promise
             type: "text",
             text: `Analyze this credit report and identify every negative, inaccurate, or unverified account. Include derogatory tradelines (collections, charge-offs, late payments, repossessions, foreclosures), public records, hard inquiries worth challenging, and personal-information errors (name variations, old addresses, employers) as their own items. Report one item per account, listing every bureau that reports it, and note where the bureaus disagree. Also capture the report date and any credit scores printed on it.
 
-For each item, tell me which consumer laws apply (FCRA/FDCPA), the strongest dispute angle, and the exact next steps to remove it. Do not list accounts that are positive and accurate.`,
+For each item, tell me which consumer laws apply (FCRA/FDCPA), the strongest dispute angle, and the exact next steps to remove it. Do not list accounts that are positive and accurate.
+${
+  known.length
+    ? `
+The client's file already contains the items below, from earlier reports. Bureaus print the same account differently: names may be abbreviated or truncated (e.g. "WFBNA AUTO" and "WELLS FARGO AUTO"), and account numbers masked differently (one bureau shows the last digits, another the first). When an account or record in this report is the same one as an existing item, set same_as_item_id to that item's id; otherwise null. Only match when you are confident it is the same account, not merely the same lender: one lender can have several separate accounts.
+
+<existing_items>
+${JSON.stringify(known)}
+</existing_items>`
+    : "Set same_as_item_id to null for every item."
+}`,
           },
         ],
       },
@@ -292,4 +319,37 @@ export function chatStream(args: {
     ],
     messages: args.messages,
   });
+}
+
+const DuplicateSchema = z.object({
+  groups: z.array(
+    z.object({
+      item_ids: z.array(z.number()).describe("Ids of items that are the same account or record, at least two"),
+      reason: z.string().describe("One sentence on why these are the same, citing names, account numbers or dates"),
+    }),
+  ),
+});
+
+/** Groups items in one client's file that are the same account reported more than once. */
+export async function findDuplicateGroups(items: KnownItem[]): Promise<{ item_ids: number[]; reason: string }[]> {
+  if (items.length < 2) return [];
+  const stream = client().messages.stream({
+    model: MODEL,
+    max_tokens: 16000,
+    output_config: { effort: "medium", format: zodOutputFormat(DuplicateSchema) },
+    system: SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: `These items in one client's file came from several credit reports, so the same account may appear more than once. Bureaus print names differently (abbreviated or truncated, e.g. "WFBNA AUTO" vs "WELLS FARGO AUTO") and mask account numbers differently (last digits on one report, first digits on another). Group the items that are the same account or record. Only group items you are confident are the same account, not merely the same lender: one lender can have several separate accounts, and two numbers whose visible digits differ are different accounts. Leave out items with no duplicate.
+
+<items>
+${JSON.stringify(items)}
+</items>`,
+      },
+    ],
+  });
+  const msg = await stream.finalMessage();
+  checkStop(msg);
+  return DuplicateSchema.parse(msg.parsed_output ?? JSON.parse(textOf(msg))).groups;
 }

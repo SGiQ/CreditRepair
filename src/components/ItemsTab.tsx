@@ -2,6 +2,7 @@
 import { Fragment, useState } from "react";
 import { BUREAUS, CATEGORY_LABEL, ITEM_STATUSES, STATUS_LABEL, type Item, type ItemStatus } from "@/lib/types";
 import type { TabProps } from "./ClientWorkspace";
+import { DuplicatesPanel } from "./DuplicatesPanel";
 import { api, Badge, Button, Card, inputClass, type Tone } from "./ui";
 
 export const STATUS_TONE: Record<ItemStatus, Tone> = {
@@ -68,6 +69,7 @@ export function ItemsTab({ bundle, reload, onDraft }: TabProps & { onDraft: (ids
         <span className="text-sm text-stone-500">
           {shown.length} of {items.length}
         </span>
+        <DuplicatesPanel clientId={bundle.client.id} items={items} reload={reload} />
         <Button variant="primary" className="ml-auto" disabled={!checked.size} onClick={() => onDraft([...checked])}>
           Draft letters for {checked.size || "selected"} →
         </Button>

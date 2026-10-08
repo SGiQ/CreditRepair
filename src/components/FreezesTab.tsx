@@ -185,6 +185,7 @@ function Confirmation({
       <div className="flex basis-full flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
         <span className="font-medium">✓ Freeze confirmed {fmtDate(freeze.confirmed_on)}</span>
         {freeze.confirmation_number && <span className="text-emerald-800">Confirmation # {freeze.confirmation_number}</span>}
+        {freeze.added_by === "client" && <span className="text-xs text-emerald-800/80">Added by client</span>}
         {freeze.doc_name ? (
           <a href={url} target="_blank" rel="noreferrer" className="font-medium text-emerald-700 hover:underline">
             View letter ↗
