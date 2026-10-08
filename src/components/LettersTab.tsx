@@ -19,14 +19,23 @@ const DEFAULT_PICK: Record<DraftType, (i: Item) => boolean> = {
   method_of_verification: (i) => i.status === "verified",
   no_response: (i) => i.status === "awaiting_response",
   final_notice: (i) => i.status === "verified" || i.status === "awaiting_response",
-  cfpb_complaint: (i) => i.status === "verified" || i.status === "awaiting_response",
+  // Matches cfpbReady() on the server: the CFPB turns away complaints filed before the dispute is 45 days old or answered.
+  cfpb_complaint: () => true,
   identity_theft_affidavit: (i) => i.identity_theft,
 };
 
 export function LettersTab({ bundle, reload, picked }: TabProps & { picked: number[] | null }) {
   const { client, items, letters } = bundle;
   const open = items.filter((i) => i.status !== "deleted" && i.status !== "updated");
-  const pick = (t: DraftType) => new Set(open.filter(DEFAULT_PICK[t]).map((i) => i.id));
+  const cfpbOk = (i: Item) =>
+    letters.some(
+      (l) =>
+        ["bureau_dispute", "method_of_verification", "no_response", "inquiry_removal", "personal_info"].includes(l.type) &&
+        l.status === "sent" &&
+        l.item_ids.includes(i.id) &&
+        (Boolean(l.response) || (Boolean(l.sent_at) && Date.now() - new Date(`${l.sent_at}T12:00:00`).getTime() >= 45 * 86_400_000)),
+    );
+  const pick = (t: DraftType) => new Set(open.filter((i) => DEFAULT_PICK[t](i) && (t !== "cfpb_complaint" || cfpbOk(i))).map((i) => i.id));
 
   const [type, setType] = useState<DraftType>("bureau_dispute");
   const [sel, setSel] = useState<Set<number>>(() => (picked?.length ? new Set(picked) : pick("bureau_dispute")));
@@ -111,7 +120,7 @@ export function LettersTab({ bundle, reload, picked }: TabProps & { picked: numb
           <div className="mt-1.5 max-h-64 space-y-0.5 overflow-y-auto rounded-md border border-stone-200 p-1.5">
             {!open.length && <p className="p-2 text-sm text-stone-500">No open items. Upload a report first.</p>}
             {open.map((i) => {
-              const blocked = type === "identity_theft_affidavit" && !i.identity_theft;
+              const blocked = (type === "identity_theft_affidavit" && !i.identity_theft) || (type === "cfpb_complaint" && !cfpbOk(i));
               return (
                 <label key={i.id} className={`flex items-start gap-2 rounded px-1.5 py-1 text-sm hover:bg-stone-50 ${blocked ? "opacity-40" : ""}`}>
                   <input type="checkbox" className="mt-1" disabled={blocked} checked={sel.has(i.id) && !blocked} onChange={() => setSel(flip(sel, i.id))} />
@@ -125,6 +134,12 @@ export function LettersTab({ bundle, reload, picked }: TabProps & { picked: numb
               );
             })}
           </div>
+          {type === "cfpb_complaint" && (
+            <p className="mt-1.5 text-xs text-stone-500">
+              Only items whose bureau dispute was mailed more than 45 days ago, or already answered, can be included. The CFPB turns
+              away earlier complaints.
+            </p>
+          )}
           {type === "identity_theft_affidavit" && (
             <p className="mt-1.5 text-xs text-stone-500">Only items flagged as identity theft on the Negative items tab can be included.</p>
           )}

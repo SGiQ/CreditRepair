@@ -229,7 +229,7 @@ export function clientSteps(b: ClientBundle): Step[] {
       expect: "Companies usually respond to CFPB complaints within about 15 days.",
             title: "File your CFPB complaint",
             detail:
-              "Your specialist has written a complaint for you. Only you can file it: download it, open consumerfinance.gov/complaint, choose \"Credit reporting\", and paste the text into the \"What happened\" box. Then press \"I filed this\". The company usually has 15 days to respond.",
+              "Your specialist has written a complaint for you. Only you can file it: download it, open consumerfinance.gov/complaint, start a new complaint about credit reporting, and paste the text where it asks what happened. Then press \"I filed this\". The company usually has 15 days to respond.",
             done: !cfpbToFile(b).length,
             target: "letters",
             cta: "Go to your complaint",

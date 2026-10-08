@@ -290,7 +290,7 @@ function LetterRow({
           <a className="font-medium text-emerald-700 hover:underline" href={CFPB_URL} target="_blank" rel="noreferrer">
             consumerfinance.gov/complaint ↗
           </a>
-          , choose &ldquo;Credit reporting&rdquo;, and paste the text into the &ldquo;What happened&rdquo; box. Then press &ldquo;I filed this&rdquo;.
+          , start a new complaint about credit reporting, and paste the text where it asks what happened. Then press &ldquo;I filed this&rdquo;.
         </p>
       )}
       {choosing && l.payment_status === "paid" && (

@@ -146,7 +146,7 @@ export const LETTER_TYPES = {
     label: "CFPB complaint narrative",
     to: "cfpb",
     stage: "Escalation",
-    desc: "Ready-to-paste complaint narrative for consumerfinance.gov/complaint.",
+    desc: "Ready-to-paste complaint narrative for consumerfinance.gov/complaint. The CFPB only takes credit reporting complaints once the bureau dispute was sent over 45 days ago or is finished.",
   },
   identity_theft_affidavit: {
     label: "Identity theft affidavit + §605B block",

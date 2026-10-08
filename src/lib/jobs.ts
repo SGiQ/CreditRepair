@@ -74,11 +74,33 @@ function planLetters(type: LetterType, items: Item[], bureaus: Bureau[]): Planne
     );
 }
 
+const BUREAU_DISPUTES = new Set(["bureau_dispute", "method_of_verification", "no_response", "inquiry_removal", "personal_info"]);
+
+/** True once a bureau dispute covering this item was sent 45+ days ago or got an answer (the CFPB's filing rule). */
+export function cfpbReady(itemId: number, letters: ReturnType<typeof getLetters>): boolean {
+  return letters.some(
+    (l) =>
+      BUREAU_DISPUTES.has(l.type) &&
+      l.status === "sent" &&
+      l.item_ids.includes(itemId) &&
+      (Boolean(l.response) || (Boolean(l.sent_at) && Date.now() - new Date(`${l.sent_at}T12:00:00`).getTime() >= 45 * 86_400_000)),
+  );
+}
+
 export function createLetters(clientId: number, type: LetterType, itemIds: number[], bureaus: Bureau[]): number[] {
   if (type === "freeze_request") throw new Error("Use the Freezes tab for freeze requests.");
   const client = getClient(clientId);
   if (!client) throw new Error("Client not found");
   let items = getItems(clientId).filter((i) => itemIds.includes(i.id));
+  if (type === "cfpb_complaint") {
+    const history = getLetters(clientId);
+    items = items.filter((i) => cfpbReady(i.id, history));
+    if (!items.length) {
+      throw new Error(
+        "The CFPB only accepts credit reporting complaints after the bureau dispute was sent more than 45 days ago, or the bureau has answered. None of the selected items qualify yet.",
+      );
+    }
+  }
   if (type === "identity_theft_affidavit") {
     items = items.filter((i) => i.identity_theft);
     if (!items.length) {
