@@ -64,7 +64,7 @@ export function OverviewTab({ bundle, reload, goTo }: TabProps & { goTo: (tab: s
 
       <ScoreCard clientId={client.id} scores={bundle.scores} reload={reload} role="admin" />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-2">
         <ReportUpload
           clientId={client.id}
           reports={reports}

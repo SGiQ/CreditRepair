@@ -1,12 +1,12 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { clientSteps } from "@/lib/steps";
+import { clientSteps, keyDates } from "@/lib/steps";
 import { BUREAUS, CATEGORY_LABEL, LETTER_TYPES, STATUS_LABEL, canMail, CFPB_URL, type ClientBundle, type ItemStatus, type Letter } from "@/lib/types";
 import { STATUS_TONE } from "./ItemsTab";
 import { ReportUpload } from "./ReportUpload";
 import { ScoreCard } from "./ScoreCard";
 import { SignatureCard } from "./SignatureCard";
-import { StepGuide } from "./StepGuide";
+import { ProgressSidebar } from "./ProgressSidebar";
 import { api, Badge, Button, Card, ErrorNote, fmtDate, inputClass, linkButton } from "./ui";
 
 // Plainer wording than the specialist's working statuses.
@@ -73,12 +73,8 @@ export function ClientPortal({ id }: { id: number }) {
       </div>
       {notice && <p className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{notice}</p>}
 
-      <StepGuide
-        heading="Your steps"
-        steps={clientSteps(bundle)}
-        onAction={(step) => document.getElementById(step.target ?? "")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-      />
-
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="min-w-0 space-y-6">
       <Card className="p-5">
         <div className="grid grid-cols-3 gap-5">
           {stats.map((s) => (
@@ -98,7 +94,7 @@ export function ClientPortal({ id }: { id: number }) {
 
       <ScoreCard clientId={client.id} scores={bundle.scores} reload={reload} role="client" />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-2">
         <div id="reports" className="scroll-mt-6">
         <ReportUpload
           clientId={client.id}
@@ -155,6 +151,15 @@ export function ClientPortal({ id }: { id: number }) {
           ))}
         </ul>
       </Card>
+        </div>
+
+        <ProgressSidebar
+          title="Your progress"
+          steps={clientSteps(bundle)}
+          dates={keyDates(bundle, "client")}
+          onAction={(step) => document.getElementById(step.target ?? "")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+        />
+      </div>
     </div>
   );
 }

@@ -12,6 +12,14 @@ export interface Step {
   /** Workspace tab (specialist) or page section (client) where the step is done. */
   target?: string;
   cta?: string;
+  /** Plain-language note on timing and what happens next, shown for the current step. */
+  expect?: string;
+}
+
+export interface KeyDate {
+  label: string;
+  value: string;
+  tone?: "red" | "amber";
 }
 
 const DAY = 86_400_000;
@@ -54,6 +62,7 @@ export function adminSteps(b: ClientBundle): Step[] {
   return [
     {
       key: "details",
+      expect: "Takes a minute. Everything here prints on the letters exactly as entered.",
       title: "Complete the client's details",
       detail: missing.length
         ? `Still needed: ${missing.join(", ")}. These print on every letter, and the bureaus use them to find the file.`
@@ -64,6 +73,7 @@ export function adminSteps(b: ClientBundle): Step[] {
     },
     {
       key: "report",
+      expect: "Each report takes about 2–5 minutes to analyze. You can leave the page while it runs.",
       title: "Upload their credit report",
       detail: analyzing
         ? "The agent is reading the report now. This takes a few minutes."
@@ -75,6 +85,7 @@ export function adminSteps(b: ClientBundle): Step[] {
     },
     {
       key: "review",
+      expect: "Allow 10–15 minutes per report. Lead with the strong items; weak ones are often better as goodwill requests.",
       title: "Review the negative items",
       detail: `${plural(items.length, "item")} found. Open each one to check the dispute angle, add anything ${first} has told you in the notes, and remove any that should not be disputed.`,
       done: items.length > 0 && (ds.length > 0 || items.some((i) => i.status !== "identified")),
@@ -83,6 +94,7 @@ export function adminSteps(b: ClientBundle): Step[] {
     },
     {
       key: "freeze",
+      expect: "Online freezes take a few minutes each. Mail-in requests usually take 1–3 weeks to be confirmed.",
       title: "Freeze the secondary bureaus",
       detail: "Request freezes at LexisNexis, Innovis, ChexSystems and the others, online or with a mail-in letter. Optional, but best done before disputes go out.",
       done: frozen,
@@ -92,6 +104,7 @@ export function adminSteps(b: ClientBundle): Step[] {
     },
     {
       key: "draft",
+      expect: "Each letter takes about a minute to write. Read every one before it goes out.",
       title: "Draft the dispute letters",
       detail: drafting
         ? "The agent is writing the letters now."
@@ -103,6 +116,7 @@ export function adminSteps(b: ClientBundle): Step[] {
     },
     {
       key: "mail",
+      expect: "Certified mail usually arrives in 3–5 business days. The reply clock starts on delivery.",
       title: "Get the letters signed and mailed",
       detail: !drafts.length
         ? "Every drafted letter has been mailed."
@@ -115,6 +129,7 @@ export function adminSteps(b: ClientBundle): Step[] {
     },
     {
       key: "outcome",
+      expect: "Bureaus generally have 30 days to finish (up to 45 if more information is sent mid-dispute). Results come by mail.",
       title: "Record the replies",
       detail: overdue.length
         ? `${plural(overdue.length, "letter")} past the 30-day deadline. Record "No response" on each, then draft a no-response follow-up.`
@@ -128,6 +143,7 @@ export function adminSteps(b: ClientBundle): Step[] {
     },
     {
       key: "followup",
+      expect: "Many files need more than one round. Each round runs about 30–45 days.",
       title: "Follow up until every item is resolved",
       detail: !open.length
         ? "Every tracked item has been deleted or corrected."
@@ -162,6 +178,7 @@ export function clientSteps(b: ClientBundle): Step[] {
   return [
     {
       key: "upload",
+      expect: "Takes about 5 minutes. Save each bureau's report as a PDF, then upload them here.",
       title: "Upload your credit report",
       detail: "Get your free reports at annualcreditreport.com (or from your credit monitoring app), save them as a PDF, and upload the file below.",
       done: uploaded,
@@ -170,6 +187,7 @@ export function clientSteps(b: ClientBundle): Step[] {
     },
     {
       key: "review",
+      expect: "The automatic review takes a few minutes. Your specialist then decides which items to dispute.",
       title: "We review your report",
       detail: analyzing
         ? "Your report is being read right now. This takes a few minutes."
@@ -179,6 +197,7 @@ export function clientSteps(b: ClientBundle): Step[] {
     },
     {
       key: "prepare",
+      expect: "Your specialist writes a letter for each bureau or company. You'll see them here when they're ready.",
       title: "Your letters are prepared",
       detail: "Your specialist writes a letter for each bureau or creditor. They will appear under Your letters. Nothing for you to do yet.",
       done: ds.length > 0,
@@ -186,6 +205,7 @@ export function clientSteps(b: ClientBundle): Step[] {
     },
     {
       key: "mail",
+      expect: "Certified mail usually arrives in 3–5 business days. Keep your receipts.",
       title: b.mail.enabled ? "Approve your letters" : "Print, sign and mail your letters",
       detail: !drafts.length
         ? "All of your letters have been mailed."
@@ -204,6 +224,7 @@ export function clientSteps(b: ClientBundle): Step[] {
       ? [
           {
             key: "cfpb",
+      expect: "Companies usually respond to CFPB complaints within about 15 days.",
             title: "File your CFPB complaint",
             detail:
               "Your specialist has written a complaint for you. Only you can file it: download it, open consumerfinance.gov/complaint, choose \"Credit reporting\", and paste the text into the \"What happened\" box. Then press \"I filed this\". The company usually has 15 days to respond.",
@@ -215,6 +236,7 @@ export function clientSteps(b: ClientBundle): Step[] {
       : []),
     {
       key: "wait",
+      expect: "Bureaus generally have 30 days to answer. Watch your mail for envelopes from Equifax, Experian and TransUnion.",
       title: "Wait for the replies",
       detail: waiting.some((l) => dueMs(l) < Date.now())
         ? "At least one reply is past its 30-day deadline. If anything has arrived in the mail, tell your specialist what it says; if not, they will send a follow-up."
@@ -226,6 +248,7 @@ export function clientSteps(b: ClientBundle): Step[] {
     },
     {
       key: "refresh",
+      expect: "Pull a new report once the replies are in, usually 35–45 days after mailing.",
       title: "Upload a fresh report",
       detail: "Once replies arrive, pull a new credit report and upload it so we can confirm what was deleted or corrected and plan the next round.",
       done: freshReport && answered,
@@ -233,4 +256,38 @@ export function clientSteps(b: ClientBundle): Step[] {
       cta: "Upload new report",
     },
   ];
+}
+
+const shortDate = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+/** The few dates that matter right now: next reply due, latest report, and what's waiting on someone. */
+export function keyDates(b: ClientBundle, role: "admin" | "client"): KeyDate[] {
+  const ds = disputes(b);
+  const waiting = awaiting(ds);
+  const out: KeyDate[] = [];
+  if (waiting.length) {
+    const next = Math.min(...waiting.map(dueMs));
+    const days = Math.ceil((next - Date.now()) / DAY);
+    out.push({
+      label: "Next reply due",
+      value: `${shortDate(next)} (${days < 0 ? `${-days} days overdue` : days === 0 ? "today" : `${days} days`})`,
+      tone: days < 0 ? "red" : days <= 7 ? "amber" : undefined,
+    });
+  }
+  const uploads = b.reports.filter((r) => r.status !== "error").map((r) => r.uploaded_at).sort();
+  if (uploads.length) {
+    const last = uploads[uploads.length - 1];
+    const ms = new Date(`${last.replace(" ", "T")}Z`).getTime();
+    out.push({ label: "Latest report", value: `${shortDate(ms)} (${Math.max(0, Math.floor((Date.now() - ms) / DAY))} days ago)` });
+  }
+  const drafts = toMail(ds);
+  if (role === "client") {
+    const toApprove = drafts.filter((l) => canMail(l.type) && !l.signed_at).length;
+    if (b.mail.enabled && toApprove) out.push({ label: "Letters to approve", value: String(toApprove), tone: "amber" });
+    else if (drafts.length) out.push({ label: "Letters to mail", value: String(drafts.length), tone: "amber" });
+  } else if (drafts.length) {
+    out.push({ label: "Letters not yet mailed", value: String(drafts.length), tone: "amber" });
+  }
+  if (waiting.length) out.push({ label: "Letters awaiting reply", value: String(waiting.length) });
+  return out;
 }

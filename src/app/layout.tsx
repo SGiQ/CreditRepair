@@ -19,7 +19,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">
         <header className="border-b border-stone-200 bg-white">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3">
             <Link href="/" className="flex items-center gap-2.5 font-semibold tracking-tight">
               <span className="grid h-7 w-7 place-items-center rounded-md bg-emerald-700 text-sm text-white">CR</span>
               Credit Repair Desk
@@ -47,8 +47,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             )}
           </div>
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-8">{children}</main>
-        <footer className="mx-auto w-full max-w-6xl px-5 pb-8 text-xs leading-relaxed text-stone-500">
+        <main className="mx-auto w-full max-w-7xl flex-1 px-5 py-8">{children}</main>
+        <footer className="mx-auto w-full max-w-7xl px-5 pb-8 text-xs leading-relaxed text-stone-500">
           Drafting and tracking tool — not legal advice. Dispute only information that is inaccurate, incomplete, or
           unverifiable, and review every letter before it is mailed.
         </footer>

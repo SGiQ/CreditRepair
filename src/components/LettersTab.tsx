@@ -59,7 +59,7 @@ export function LettersTab({ bundle, reload, picked }: TabProps & { picked: numb
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[22rem_1fr]">
+    <div className="grid gap-6 xl:grid-cols-[20rem_minmax(0,1fr)]">
       <Card className="h-fit space-y-4 p-5">
         <h2 className="font-semibold">Draft letters</h2>
         <label className="block text-xs font-medium text-stone-600">

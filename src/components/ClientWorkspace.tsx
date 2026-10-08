@@ -1,14 +1,14 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { adminSteps } from "@/lib/steps";
+import { adminSteps, keyDates } from "@/lib/steps";
 import type { ClientBundle } from "@/lib/types";
 import { AdvisorTab } from "./AdvisorTab";
 import { FreezesTab } from "./FreezesTab";
 import { ItemsTab } from "./ItemsTab";
 import { LettersTab } from "./LettersTab";
 import { OverviewTab } from "./OverviewTab";
-import { StepGuide } from "./StepGuide";
+import { ProgressSidebar } from "./ProgressSidebar";
 import { api, ErrorNote } from "./ui";
 
 const TABS = ["Overview", "Negative items", "Letters", "Freezes", "Advisor"] as const;
@@ -74,8 +74,8 @@ export function ClientWorkspace({ id }: { id: number }) {
         </p>
       )}
 
-      <StepGuide compact heading="Where this file stands" steps={adminSteps(bundle)} onAction={(step) => setTab(step.target as Tab)} />
-
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="min-w-0 space-y-6">
       <nav className="flex gap-1 overflow-x-auto border-b border-stone-200">
         {TABS.map((t) => (
           <button
@@ -104,6 +104,18 @@ export function ClientWorkspace({ id }: { id: number }) {
       {tab === "Letters" && <LettersTab {...props} picked={picked} />}
       {tab === "Freezes" && <FreezesTab {...props} />}
       {tab === "Advisor" && <AdvisorTab {...props} />}
+        </div>
+
+        <ProgressSidebar
+          title="Where this file stands"
+          steps={adminSteps(bundle)}
+          dates={keyDates(bundle, "admin")}
+          onAction={(step) => {
+            setTab(step.target as Tab);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
+      </div>
     </div>
   );
 }
