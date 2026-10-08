@@ -341,7 +341,7 @@ db.exec("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT N
 db.prepare("INSERT INTO settings (key, value) VALUES ('mail_fee_cents', '1000') ON CONFLICT (key) DO NOTHING").run();
 
 const freeze = db.prepare("INSERT INTO freezes (client_id, agency, status) VALUES (?, ?, ?)");
-for (const [agency, status] of [["lexisnexis", "frozen"], ["innovis", "frozen"], ["chexsystems", "requested"], ["corelogic", "requested"]]) {
+for (const [agency, status] of [["lexisnexis", "frozen"], ["innovis", "frozen"], ["chexsystems", "requested"], ["clarity", "requested"]]) {
   freeze.run(clientId, agency, status);
 }
 

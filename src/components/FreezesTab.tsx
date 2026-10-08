@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { SECONDARY_AGENCIES } from "@/lib/agencies";
+import { AGENCIES_CHECKED, AGENCY_SOURCE, SECONDARY_AGENCIES } from "@/lib/agencies";
 import type { Freeze } from "@/lib/types";
 import type { TabProps } from "./ClientWorkspace";
 import { api, Button, Card, inputClass } from "./ui";
@@ -37,9 +37,12 @@ export function FreezesTab({ bundle, reload }: TabProps) {
               <div className="min-w-0 flex-1 basis-72">
                 <div className="font-medium">{a.name}</div>
                 <div className="text-sm text-stone-600">{a.what}</div>
+                <div className="mt-0.5 text-xs text-stone-500">
+                  Phone {a.phone} · {a.address.split("\n").slice(-2).join(", ")}
+                </div>
               </div>
               <a href={a.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-emerald-700 hover:underline">
-                Freeze online ↗
+                {a.online ? "Freeze online ↗" : "Freeze form & instructions ↗"}
               </a>
               <Button
                 small
@@ -65,8 +68,12 @@ export function FreezesTab({ bundle, reload }: TabProps) {
         })}
       </Card>
       <p className="text-xs text-stone-500">
-        Agency mailing addresses change. Confirm the address on the agency&apos;s site before mailing — the recipient block
-        on every letter is editable.
+        Links, phone numbers and addresses were checked on each agency&apos;s own site in {AGENCIES_CHECKED} and against the{" "}
+        <a href={AGENCY_SOURCE} target="_blank" rel="noreferrer" className="underline">
+          CFPB&apos;s list of consumer reporting companies
+        </a>
+        . Agencies move and merge, so confirm the address on the agency&apos;s page before mailing; the recipient block on every
+        letter is editable.
       </p>
     </div>
   );
