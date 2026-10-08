@@ -3,7 +3,7 @@ import { useState } from "react";
 import { AGENCIES_CHECKED, AGENCY_SOURCE, SECONDARY_AGENCIES } from "@/lib/agencies";
 import type { Freeze } from "@/lib/types";
 import type { TabProps } from "./ClientWorkspace";
-import { api, Button, Card, inputClass } from "./ui";
+import { api, Button, Card, ErrorNote, fmtDate, inputClass } from "./ui";
 
 export function FreezesTab({ bundle, reload }: TabProps) {
   const { client, freezes, letters } = bundle;
@@ -89,6 +89,7 @@ export function FreezesTab({ bundle, reload }: TabProps) {
                 <option value="requested">Requested</option>
                 <option value="frozen">Frozen ✓</option>
               </select>
+              <Confirmation clientId={client.id} agency={a.key} freeze={freezes.find((f) => f.agency === a.key)} reload={reload} />
             </div>
           );
         })}
@@ -103,5 +104,117 @@ export function FreezesTab({ bundle, reload }: TabProps) {
         letter is editable.
       </p>
     </div>
+  );
+}
+
+/** Proof that a freeze took effect: date, confirmation number and the agency's letter. */
+function Confirmation({
+  clientId,
+  agency,
+  freeze,
+  reload,
+}: {
+  clientId: number;
+  agency: string;
+  freeze?: Freeze;
+  reload: () => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [date, setDate] = useState(freeze?.confirmed_on || new Date().toLocaleDateString("en-CA"));
+  const [number, setNumber] = useState(freeze?.confirmation_number ?? "");
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const url = `/api/clients/${clientId}/freezes/${agency}`;
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const body = new FormData();
+      body.append("confirmed_on", date);
+      body.append("confirmation_number", number);
+      if (file) body.append("file", file);
+      await api(url, { method: "POST", body });
+      setEditing(false);
+      setFile(null);
+      await reload();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+    setBusy(false);
+  }
+
+  if (editing) {
+    return (
+      <form onSubmit={save} className="basis-full space-y-2 rounded-lg bg-stone-50 p-3 text-sm">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="text-xs font-medium text-stone-600">
+            Freeze placed on
+            <input type="date" required max={new Date().toLocaleDateString("en-CA")} className={`${inputClass} mt-1 !w-40 font-normal`} value={date} onChange={(e) => setDate(e.target.value)} />
+          </label>
+          <label className="text-xs font-medium text-stone-600">
+            Confirmation number <span className="font-normal text-stone-400">(optional)</span>
+            <input className={`${inputClass} mt-1 !w-48 font-normal`} maxLength={60} value={number} onChange={(e) => setNumber(e.target.value)} />
+          </label>
+          <label className="text-xs font-medium text-stone-600">
+            Confirmation letter <span className="font-normal text-stone-400">(PDF or photo, optional)</span>
+            <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="mt-1 block text-xs font-normal" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          </label>
+        </div>
+        <p className="text-xs text-amber-800">
+          Don&apos;t type the freeze PIN anywhere here. Confirmation letters usually print it: cover it before scanning, or know the
+          stored letter will include it. Stored letters are visible to admins only, never in the client portal.
+        </p>
+        <ErrorNote>{error}</ErrorNote>
+        <div className="flex gap-2">
+          <Button small variant="primary" disabled={busy}>
+            {busy ? "Saving…" : "Save confirmation"}
+          </Button>
+          <Button small type="button" variant="ghost" onClick={() => setEditing(false)}>
+            Cancel
+          </Button>
+        </div>
+      </form>
+    );
+  }
+
+  if (freeze?.confirmed_on) {
+    return (
+      <div className="flex basis-full flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+        <span className="font-medium">✓ Freeze confirmed {fmtDate(freeze.confirmed_on)}</span>
+        {freeze.confirmation_number && <span className="text-emerald-800">Confirmation # {freeze.confirmation_number}</span>}
+        {freeze.doc_name ? (
+          <a href={url} target="_blank" rel="noreferrer" className="font-medium text-emerald-700 hover:underline">
+            View letter ↗
+          </a>
+        ) : (
+          <span className="text-xs text-emerald-800/70">No letter attached</span>
+        )}
+        <span className="ml-auto flex gap-3 text-xs">
+          <button type="button" className="text-emerald-800 hover:underline" onClick={() => setEditing(true)}>
+            {freeze.doc_name ? "Edit" : "Edit or attach letter"}
+          </button>
+          <button
+            type="button"
+            className="text-stone-500 hover:text-red-700"
+            onClick={async () => {
+              if (!confirm("Remove this confirmation and delete the stored letter? The agency stays marked as frozen.")) return;
+              await api(url, { method: "DELETE" });
+              await reload();
+            }}
+          >
+            Remove
+          </button>
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <button type="button" className="basis-full text-left text-xs font-medium text-emerald-700 hover:underline" onClick={() => setEditing(true)}>
+      + Add freeze confirmation (date, confirmation number, letter)
+    </button>
   );
 }

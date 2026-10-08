@@ -102,7 +102,7 @@ export function getBundle(id: number, role: "admin" | "client" = "admin"): Clien
     items: getItems(id),
     letters: getLetters(id),
     scores,
-    freezes: all<Freeze>("SELECT agency, status FROM freezes WHERE client_id = ?", id),
+    freezes: all<Freeze>("SELECT agency, status, confirmed_on, confirmation_number, doc_name FROM freezes WHERE client_id = ?", id),
     hasApiKey: hasApiKey(),
   };
 }

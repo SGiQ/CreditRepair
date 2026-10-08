@@ -32,6 +32,9 @@ export async function DELETE(_: Request, ctx: Ctx) {
   for (const r of all<{ stored_path: string }>("SELECT stored_path FROM reports WHERE client_id = ?", id)) {
     fs.rmSync(r.stored_path, { force: true });
   }
+  for (const f of all<{ doc_path: string }>("SELECT doc_path FROM freezes WHERE client_id = ? AND doc_path != ''", id)) {
+    fs.rmSync(f.doc_path, { force: true });
+  }
   run("DELETE FROM clients WHERE id = ?", id);
   return ok();
 }

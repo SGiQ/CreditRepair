@@ -255,6 +255,11 @@ export interface Score {
 export interface Freeze {
   agency: string;
   status: "todo" | "requested" | "frozen";
+  /** Date the agency says the freeze took effect. */
+  confirmed_on: string;
+  confirmation_number: string;
+  /** Original filename of the uploaded confirmation letter; "" when none. The stored path never leaves the server. */
+  doc_name: string;
 }
 
 export interface SessionUser {
