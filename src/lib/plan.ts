@@ -11,7 +11,16 @@ interface Row {
   data: string;
   answers: string;
   drafted_rounds: string;
+  answer_log: string;
   created_at: string;
+}
+
+type Answered = { question: string; answer: string };
+
+/** Every answer ever given on this client's plans, latest first per question. */
+function answerLog(clientId: number): Answered[] {
+  const r = get<{ answer_log: string }>("SELECT answer_log FROM plans WHERE client_id = ?", clientId);
+  return parse<Answered[]>(r?.answer_log ?? "[]", []);
 }
 
 const parse = <T>(s: string, fallback: T): T => {
@@ -48,20 +57,22 @@ export function getPlan(clientId: number): Plan | null {
 /** Starts a fresh plan in the background; the page polls until it is ready. */
 export function startPlan(clientId: number, goal: string) {
   const prev = getPlan(clientId);
-  // Carry earlier questions and answers forward so the new plan can use them.
-  const answered = (prev?.data?.questions ?? [])
+  // Answers carry forward for good: earlier refreshes' answers plus the ones saved on the current plan.
+  const fresh = (prev?.data?.questions ?? [])
     .map((q, n) => ({ question: q.question, answer: (prev?.answers[String(n)] ?? "").trim() }))
     .filter((a) => a.answer);
+  const answered = [...fresh, ...answerLog(clientId).filter((a) => !fresh.some((f) => f.question === a.question))].slice(0, 60);
   run(
     `INSERT INTO plans (client_id, status, error, goal, data, answers, drafted_rounds, created_at)
      VALUES (?, 'generating', '', ?, ?, '{}', '[]', datetime('now'))
      ON CONFLICT (client_id) DO UPDATE SET status = 'generating', error = '', goal = excluded.goal, created_at = datetime('now')`,
     clientId, goal, prev?.data ? JSON.stringify(prev.data) : "",
   );
+  run("UPDATE plans SET answer_log = ? WHERE client_id = ?", JSON.stringify(answered), clientId);
   void (async () => {
     try {
       const data = await generatePlan({ goal, items: getItems(clientId), letters: getLetters(clientId), answers: answered });
-      // Answers belonged to the old questions; keep them as a record inside the new plan's input only.
+      // Answers to the old questions now live in answer_log; the new questions start blank.
       run("UPDATE plans SET status = 'done', data = ?, answers = '{}', drafted_rounds = '[]', created_at = datetime('now') WHERE client_id = ?", JSON.stringify(data), clientId);
     } catch (e) {
       console.error("plan failed", e);
