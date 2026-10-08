@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/auth";
 import { run, updateRow } from "@/lib/db";
 import { bad, ok, idOf, type Ctx } from "@/lib/http";
-import { getLetter, markLetterSent } from "@/lib/store";
+import { getLetter, markLetterSent, reconcileItemStatuses } from "@/lib/store";
 
 const FIELDS = ["recipient_name", "recipient_address", "subject", "body", "enclosures", "status", "sent_at", "response"];
 
@@ -30,6 +30,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     run("UPDATE letters SET signed_at = '' WHERE id = ?", id);
   }
   updateRow("letters", id, b, FIELDS);
+  if (b.status === "draft") reconcileItemStatuses(letter.client_id, letter.item_ids);
   if (b.status === "sent") markLetterSent(letter, b.sent_at);
   return ok();
 }
@@ -37,6 +38,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
 export async function DELETE(_: Request, ctx: Ctx) {
   const auth = await requireAdmin();
   if (auth instanceof Response) return auth;
-  run("DELETE FROM letters WHERE id = ?", await idOf(ctx));
+  const letter = getLetter(await idOf(ctx));
+  if (!letter) return bad("Letter not found", 404);
+  run("DELETE FROM letters WHERE id = ?", letter.id);
+  // Items that were only "in dispute" because of this letter go back to where they were.
+  reconcileItemStatuses(letter.client_id, letter.item_ids);
   return ok();
 }

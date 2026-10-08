@@ -151,3 +151,26 @@ function clientPlan(clientId: number) {
     data: { ...p.data, rounds: p.data.rounds.map((r) => ({ ...r, actions: r.actions.map((a) => ({ ...a, note: "" })) })) },
   };
 }
+
+/**
+ * Brings item statuses back in line with the letters that actually exist: an item marked "dispute drafted"
+ * with no draft or sent letter left goes back to "identified", and one "awaiting response" with no sent
+ * letter left goes back to "disputed" (or "identified"). Resolved and verified items are never touched.
+ */
+export function reconcileItemStatuses(clientId: number, itemIds?: number[]) {
+  const letters = getLetters(clientId).filter((l) => l.type !== "freeze_request");
+  const drafted = new Set(letters.filter((l) => l.status === "draft" || l.status === "generating").flatMap((l) => l.item_ids));
+  const sent = new Set(letters.filter((l) => l.status === "sent").flatMap((l) => l.item_ids));
+  let changed = 0;
+  for (const i of getItems(clientId)) {
+    if (itemIds && !itemIds.includes(i.id)) continue;
+    let next = i.status;
+    if (i.status === "disputed" && !drafted.has(i.id) && !sent.has(i.id)) next = "identified";
+    if (i.status === "awaiting_response" && !sent.has(i.id)) next = drafted.has(i.id) ? "disputed" : "identified";
+    if (next !== i.status) {
+      run("UPDATE items SET status = ?, updated_at = datetime('now') WHERE id = ?", next, i.id);
+      changed++;
+    }
+  }
+  return changed;
+}
