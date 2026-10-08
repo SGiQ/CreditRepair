@@ -8,6 +8,8 @@ import { api, Button, Card, inputClass } from "./ui";
 export function FreezesTab({ bundle, reload }: TabProps) {
   const { client, freezes, letters } = bundle;
   const [note, setNote] = useState("");
+  const [drafting, setDrafting] = useState<string | null>(null);
+  const [reference, setReference] = useState("");
   const statusOf = (key: string) => freezes.find((f) => f.agency === key)?.status ?? "todo";
   const done = SECONDARY_AGENCIES.filter((a) => statusOf(a.key) !== "todo").length;
 
@@ -44,15 +46,39 @@ export function FreezesTab({ bundle, reload }: TabProps) {
               <a href={a.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-emerald-700 hover:underline">
                 {a.online ? "Freeze online ↗" : "Freeze form & instructions ↗"}
               </a>
-              <Button
-                small
-                onClick={async () => {
-                  await post({ agency: a.key, letter: true });
-                  setNote(`Freeze request for ${a.name} added to the Letters tab.`);
-                }}
-              >
-                {hasLetter ? "Draft another letter" : "Draft mail-in letter"}
-              </Button>
+              {drafting === a.key ? (
+                <form
+                  className="flex basis-full flex-wrap items-end gap-2 rounded-lg bg-stone-50 p-3 sm:basis-auto"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    await post({ agency: a.key, letter: true, reference });
+                    setNote(`Freeze request for ${a.name} added to the Letters tab.`);
+                    setDrafting(null);
+                    setReference("");
+                  }}
+                >
+                  <label className="text-xs font-medium text-stone-600">
+                    Reference number <span className="font-normal text-stone-400">(optional)</span>
+                    <input
+                      className={`${inputClass} mt-1 !w-44 font-normal`}
+                      value={reference}
+                      maxLength={40}
+                      placeholder="e.g. from a failed online request"
+                      onChange={(e) => setReference(e.target.value)}
+                    />
+                  </label>
+                  <Button small variant="primary" className="!py-2">
+                    Draft letter
+                  </Button>
+                  <Button small type="button" variant="ghost" className="!py-2" onClick={() => setDrafting(null)}>
+                    Cancel
+                  </Button>
+                </form>
+              ) : (
+                <Button small onClick={() => setDrafting(a.key)}>
+                  {hasLetter ? "Draft another letter" : "Draft mail-in letter"}
+                </Button>
+              )}
               <select
                 aria-label={`Freeze status for ${a.name}`}
                 className={`${inputClass} !w-36`}
@@ -68,7 +94,8 @@ export function FreezesTab({ bundle, reload }: TabProps) {
         })}
       </Card>
       <p className="text-xs text-stone-500">
-        Links, phone numbers and addresses were checked on each agency&apos;s own site in {AGENCIES_CHECKED} and against the{" "}
+        If an agency can&apos;t verify someone online, it usually shows a reference number and asks for a written request. Use
+        &ldquo;Draft mail-in letter&rdquo; and enter that number so the agency can match the letter to the attempt. Links, phone numbers and addresses were checked on each agency&apos;s own site in {AGENCIES_CHECKED} and against the{" "}
         <a href={AGENCY_SOURCE} target="_blank" rel="noreferrer" className="underline">
           CFPB&apos;s list of consumer reporting companies
         </a>

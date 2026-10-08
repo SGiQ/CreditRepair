@@ -159,15 +159,23 @@ async function draftInBackground(
 }
 
 /** Freeze requests are a fixed form; no model call needed. */
-export function createFreezeLetter(clientId: number, agencyKey: string): number {
+/**
+ * Mail-in freeze request to a secondary (specialty) agency. The federal freeze right in 15 U.S.C. §1681c-1(i)
+ * binds only the three nationwide bureaus, so the request rests on state law and the agency's own freeze policy.
+ * `reference` is the number an agency gives when it can't verify someone online and asks for a written request.
+ */
+export function createFreezeLetter(clientId: number, agencyKey: string, reference = ""): number {
   const agency = SECONDARY_AGENCIES.find((a) => a.key === agencyKey);
   if (!agency) throw new Error("Unknown agency");
   const [name, ...addr] = agency.address.split("\n");
+  const ref = reference.trim().slice(0, 40);
+  // "Clarity Services (Experian)" → "Clarity Services"; "DataX, incl. Teletrack (Equifax)" → "DataX".
+  const companyName = agency.name.replace(/\s*\(.*\)$/, "").replace(/,\s*incl\..*$/, "");
   const body = `To Whom It May Concern:
 
-I am writing to request that a security freeze be placed on my consumer file, as is my right under the Fair Credit Reporting Act, 15 U.S.C. §1681c-1(i). Please place the freeze on all consumer reports and files that ${agency.name} and its affiliates maintain about me.
-
-My identifying information appears above. I have enclosed copies of documents verifying my identity and current address.
+I am writing to request that a security freeze be placed on my consumer file, as provided by applicable state law and your security freeze policy. Please place the freeze on all consumer reports and files that ${companyName} maintains about me.
+${ref ? `\nI tried to place this freeze online and was asked to send a written request instead. My reference number from that request is ${ref}.\n` : ""}
+My full legal name, current address, date of birth and the last four digits of my Social Security number appear above. I have enclosed copies of the documents listed below to verify my identity and current address.
 
 Please send written confirmation that the freeze has been placed, along with the PIN or instructions I will need to lift or remove it in the future, to the address above. I understand there is no fee for placing a security freeze.
 
@@ -186,9 +194,9 @@ Thank you for your prompt attention to this request.`;
     "Request for Security Freeze",
     body,
     JSON.stringify([
-      "Copy of government-issued photo ID",
-      "Copy of Social Security card or other proof of SSN",
-      "Proof of current address (utility bill or bank statement)",
+      "Copy of my driver's license or other government-issued photo ID",
+      "Copy of my Social Security card",
+      "Proof of current address dated within the last 30 days (utility bill or bank statement)",
     ]),
   );
   return Number(res.lastInsertRowid);

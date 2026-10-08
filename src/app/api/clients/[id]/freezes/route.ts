@@ -13,7 +13,7 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!getClient(clientId)) return bad("Client not found", 404);
   const b = await req.json();
   if (!SECONDARY_AGENCIES.some((a) => a.key === b.agency)) return bad("Unknown agency");
-  if (b.letter) return ok({ id: createFreezeLetter(clientId, b.agency) });
+  if (b.letter) return ok({ id: createFreezeLetter(clientId, b.agency, typeof b.reference === "string" ? b.reference : "") });
   if (!["todo", "requested", "frozen"].includes(b.status)) return bad("Invalid status");
   run(
     `INSERT INTO freezes (client_id, agency, status) VALUES (?, ?, ?)
