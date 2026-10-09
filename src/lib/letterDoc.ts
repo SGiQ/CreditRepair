@@ -48,7 +48,8 @@ export function letterBlocks(client: Client, letter: Letter): Block[] {
   // Bureaus need identifiers to locate the file; collectors and creditors do not get them.
   if (to === "bureau" || to === "agency") {
     if (client.dob) sender.push({ text: `Date of Birth: ${client.dob}` });
-    if (client.ssn_last4) sender.push({ text: `SSN: XXX-XX-${client.ssn_last4}` });
+    // Bureaus need the full SSN to find the file; the app only stores the last four, so the rest is written by hand.
+    if (client.ssn_last4) sender.push({ text: `SSN: ______-____-${client.ssn_last4}` });
   }
 
   const out: Block[] = [
