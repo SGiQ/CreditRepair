@@ -62,7 +62,26 @@ export interface Report {
   error: string;
   summary: string;
   uploaded_at: string;
+  /** "upload" for a file someone uploaded; a provider key when it was imported from that monitoring service. */
+  source: "upload" | MonitoringProvider;
 }
+
+/**
+ * Credit monitoring services a report can be imported from. The import runs in the member's own browser: a bookmark
+ * on the service's report page sends the page to /import, so the app never holds the member's login.
+ */
+export const MONITORING_PROVIDERS = {
+  identityiq: {
+    label: "IdentityIQ",
+    site: "https://member.identityiq.com",
+    /** Host suffixes the imported page is expected to come from. */
+    hosts: ["identityiq.com"],
+    /** Where the member finds the full report once signed in. */
+    where: "Sign in, then open Credit Report (the 3-bureau report) and wait for it to finish loading.",
+  },
+} as const;
+export type MonitoringProvider = keyof typeof MONITORING_PROVIDERS;
+
 
 export interface Law {
   citation: string;

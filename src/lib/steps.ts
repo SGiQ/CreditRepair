@@ -184,7 +184,7 @@ export function clientSteps(b: ClientBundle): Step[] {
       key: "upload",
       expect: "Takes about 5 minutes. Save each bureau's report as a PDF, then upload them here.",
       title: "Upload your credit report",
-      detail: "Get your free reports at annualcreditreport.com (or from your credit monitoring app), save them as a PDF, and upload the file below.",
+      detail: "Get your free reports at annualcreditreport.com (or from your credit monitoring app), save them as a PDF, and upload the file below. IdentityIQ members can import their report with one click instead.",
       done: uploaded,
       target: "reports",
       cta: "Upload report",

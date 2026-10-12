@@ -5,6 +5,7 @@ import { hasReplyClock, LETTER_TYPES } from "@/lib/types";
 import { ClientForm } from "./ClientForm";
 import type { TabProps } from "./ClientWorkspace";
 import { PortalAccessCard } from "./PortalAccessCard";
+import { ImportCard } from "./ImportCard";
 import { ReportUpload } from "./ReportUpload";
 import { ScoreCard } from "./ScoreCard";
 import { api, Badge, Button, Card, fmtDate } from "./ui";
@@ -65,15 +66,18 @@ export function OverviewTab({ bundle, reload, goTo }: TabProps & { goTo: (tab: s
       <ScoreCard clientId={client.id} scores={bundle.scores} reload={reload} role="admin" />
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <ReportUpload
-          clientId={client.id}
-          reports={reports}
-          scores={bundle.scores}
-          reload={reload}
-          canRemove
-          intro="Upload the client's report (PDF from annualcreditreport.com or a monitoring service). The agent reads every account and builds the dispute plan."
-          onReview={() => goTo("Negative items")}
-        />
+        <div className="space-y-6">
+          <ReportUpload
+            clientId={client.id}
+            reports={reports}
+            scores={bundle.scores}
+            reload={reload}
+            canRemove
+            intro="Upload the client's report (PDF from annualcreditreport.com or a monitoring service). The agent reads every account and builds the dispute plan."
+            onReview={() => goTo("Negative items")}
+          />
+          <ImportCard clientId={client.id} clientName={client.name} reports={reports} role="admin" />
+        </div>
 
         <div className="space-y-6">
           <Card className="p-5">

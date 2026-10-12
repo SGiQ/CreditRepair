@@ -95,6 +95,23 @@ portal. Its "Request a consultation" form saves the inquiry, emails every admin,
 inquiries" on the Dashboard. The form has a spam trap and is limited to 5 submissions per hour per visitor.
 Copy lives in `src/components/Landing.tsx`.
 
+## Importing from IdentityIQ
+
+Clients on IdentityIQ (and, later, other monitoring services listed in `MONITORING_PROVIDERS` in `src/lib/types.ts`)
+can send their 3-bureau report straight from the monitoring site, with no download. The **Import from IdentityIQ**
+card on the client's Overview and in their portal gives them a bookmark, **Send report to Credit Repair Desk**, to
+drag onto their bookmarks bar. On IdentityIQ they open their credit report and click the bookmark: a small window
+(`/import`) shows what was picked up, they confirm, and the page is saved as an HTML report and analyzed like any
+upload. Each bookmark is tied to one client's file, and the window only accepts a page while that person is signed in.
+
+The import runs in the member's own browser, where they are already signed in, so the app never stores anyone's
+IdentityIQ password. That is deliberate: IdentityIQ's member site is a JavaScript app behind Imperva bot protection
+with no public API, and its terms prohibit scraping, so a server-side login with stored credentials would be both
+fragile and a terms violation. Before the page is sent it is trimmed in the browser (scripts, styles, menus and hidden
+templates removed; table structure kept so the three bureau columns stay aligned), and `src/lib/reportHtml.ts` strips
+scripts and styles from every HTML upload on the server as well. On a phone, where bookmarks can't be used this way,
+members print the report to PDF and upload it.
+
 ## Monthly report reminders
 
 Clients with a portal login get an email asking them to upload a fresh credit report every 30 days (configurable on

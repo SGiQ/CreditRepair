@@ -68,7 +68,7 @@ export function getBundle(id: number, role: "admin" | "client" = "admin"): Clien
   expireStaleJobs();
   const { signature = "", signature_at = "", ...client } = row;
   const reports = all<Report>(
-    "SELECT id, client_id, filename, status, error, summary, uploaded_at FROM reports WHERE client_id = ? ORDER BY id DESC",
+    "SELECT id, client_id, filename, status, error, summary, uploaded_at, source FROM reports WHERE client_id = ? ORDER BY id DESC",
     id,
   );
   const mail = mailConfig();

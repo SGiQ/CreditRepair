@@ -5,6 +5,7 @@ import { BUREAUS, CATEGORY_LABEL, LETTER_TYPES, STATUS_LABEL, canMail, CFPB_URL,
 import { STATUS_TONE } from "./ItemsTab";
 import { ClientFreezes } from "./ClientFreezes";
 import { PlanReport } from "./PlanView";
+import { ImportCard } from "./ImportCard";
 import { ReportUpload } from "./ReportUpload";
 import { ScoreCard } from "./ScoreCard";
 import { SignatureCard } from "./SignatureCard";
@@ -104,7 +105,7 @@ export function ClientPortal({ id }: { id: number }) {
       )}
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <div id="reports" className="scroll-mt-6">
+        <div id="reports" className="scroll-mt-6 space-y-6">
         <ReportUpload
           clientId={client.id}
           reports={reports}
@@ -113,6 +114,7 @@ export function ClientPortal({ id }: { id: number }) {
           reload={reload}
           intro="Upload your latest credit report — a PDF from annualcreditreport.com or your credit monitoring service. New reports every 30–45 days show what changed."
         />
+        <ImportCard clientId={client.id} clientName={client.name} reports={reports} role="client" />
         </div>
 
         <Card id="letters" className="h-fit scroll-mt-6 p-5">

@@ -188,6 +188,7 @@ const COLUMNS: [table: string, column: string, ddl: string][] = [
   ["letters", "payment_order_id", "TEXT NOT NULL DEFAULT ''"],
   ["letters", "paid_cents", "INTEGER NOT NULL DEFAULT 0"],
   ["letters", "paid_at", "TEXT NOT NULL DEFAULT ''"],
+  ["reports", "source", "TEXT NOT NULL DEFAULT 'upload'"],
 ];
 
 // Survive dev-server hot reloads with a single connection, but re-apply the

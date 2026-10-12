@@ -58,7 +58,7 @@ export function nextReminderAt(clientId: number): string | null {
 async function send(c: Candidate, appUrl: string) {
   const first = c.name.split(" ")[0];
   const link = `${appUrl}/portal`;
-  const text = `Hi ${first},\n\nIt's time to upload a fresh copy of your credit report so we can see what has changed and keep your file moving.\n\n1. Download your latest report — from your credit monitoring service, or free from annualcreditreport.com.\n2. Sign in and upload the PDF under "Credit reports": ${link}\n\nIf your report shows your credit scores, they'll be added to your score history automatically.\n\nYou can turn these reminders off from your portal.`;
+  const text = `Hi ${first},\n\nIt's time to upload a fresh copy of your credit report so we can see what has changed and keep your file moving.\n\n1. Download your latest report — from your credit monitoring service, or free from annualcreditreport.com.\n2. Sign in and upload the PDF under "Credit reports": ${link}\n   If you use IdentityIQ, open your report there and click the "Send report" bookmark from your portal instead — no download needed.\n\nIf your report shows your credit scores, they'll be added to your score history automatically.\n\nYou can turn these reminders off from your portal.`;
   const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]!);
   const html = `<p>${esc(text).replace(esc(link), `<a href="${esc(link)}">${esc(link)}</a>`).replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>")}</p>`;
   // Stamp first so a slow send or an overlapping tick can't double-email.

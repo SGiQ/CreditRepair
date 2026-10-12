@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import type { Report, Score } from "@/lib/types";
+import { MONITORING_PROVIDERS, type Report, type Score } from "@/lib/types";
 import { api, Badge, Button, Card, ErrorNote, fmtDate, Spinner } from "./ui";
 
 export function ReportUpload({
@@ -114,7 +114,9 @@ export function ReportUpload({
                 )}
               </span>
             </div>
-            <div className="mt-0.5 text-xs text-stone-500">Uploaded {fmtDate(r.uploaded_at)}</div>
+            <div className="mt-0.5 text-xs text-stone-500">
+              {r.source && r.source !== "upload" ? `Imported from ${MONITORING_PROVIDERS[r.source].label}` : "Uploaded"} {fmtDate(r.uploaded_at)}
+            </div>
             {r.status === "analyzing" && (
               <p className="mt-2 text-stone-600">Reading every account. Long reports take a few minutes — you can leave this page.</p>
             )}
