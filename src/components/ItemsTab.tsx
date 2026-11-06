@@ -1,4 +1,5 @@
 "use client";
+import { PAYMENT_LABELS, REVIEW_LABELS, reviewStage, evidenceChecklist, reviewError } from "@/lib/review";
 import { Fragment, useState } from "react";
 import { BUREAUS, CATEGORY_LABEL, ITEM_STATUSES, STATUS_LABEL, type Item, type ItemStatus } from "@/lib/types";
 import type { TabProps } from "./ClientWorkspace";
@@ -35,7 +36,9 @@ export function ItemsTab({ bundle, reload, onDraft }: TabProps & { onDraft: (ids
       if (!next.delete(id)) next.add(id);
       return next;
     });
-  const allChecked = shown.length > 0 && shown.every((i) => checked.has(i.id));
+  const selectable = shown.filter(i => !reviewError([i]));
+  const selectedIds = items.filter(i => checked.has(i.id) && !reviewError([i])).map(i => i.id);
+  const allChecked = selectable.length > 0 && selectable.every((i) => checked.has(i.id));
 
   if (!items.length) {
     return (
@@ -51,6 +54,11 @@ export function ItemsTab({ bundle, reload, onDraft }: TabProps & { onDraft: (ids
 
   return (
     <div className="space-y-4">
+      <Card className="p-4">
+        <h2 className="font-semibold">Your evidence-first plan</h2>
+        <p className="mt-1 text-sm text-stone-600">Start with Self and Affirm records, then the collection bill and auto-loan accounting. Mortgage accounts start on hold. Open an account below to record payment status, supporting documents and the specific issue before marking it ready.</p>
+        <p className="mt-2 text-sm">{items.filter(i => reviewStage(i) === "gather").length} gathering evidence · {items.filter(i => reviewStage(i) === "ready").length} reviewed · {items.filter(i => reviewStage(i) === "hold").length} on hold</p>
+      </Card>
       <div className="flex flex-wrap items-center gap-2">
         <select className={`${inputClass} !w-auto`} value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Filter by status">
           <option value="all">All statuses</option>
@@ -70,8 +78,8 @@ export function ItemsTab({ bundle, reload, onDraft }: TabProps & { onDraft: (ids
           {shown.length} of {items.length}
         </span>
         <DuplicatesPanel clientId={bundle.client.id} items={items} reload={reload} />
-        <Button variant="primary" className="ml-auto" disabled={!checked.size} onClick={() => onDraft([...checked])}>
-          Draft letters for {checked.size || "selected"} →
+        <Button variant="primary" className="ml-auto" disabled={!selectedIds.length} onClick={() => onDraft(selectedIds)}>
+          Draft letters for {selectedIds.length || "selected"} →
         </Button>
       </div>
 
@@ -84,7 +92,7 @@ export function ItemsTab({ bundle, reload, onDraft }: TabProps & { onDraft: (ids
                   type="checkbox"
                   aria-label="Select all"
                   checked={allChecked}
-                  onChange={() => setChecked(allChecked ? new Set() : new Set(shown.map((i) => i.id)))}
+                  onChange={() => setChecked(allChecked ? new Set() : new Set(selectable.map((i) => i.id)))}
                 />
               </th>
               <th className="px-3 py-2.5 font-medium">Account</th>
@@ -100,13 +108,14 @@ export function ItemsTab({ bundle, reload, onDraft }: TabProps & { onDraft: (ids
               <Fragment key={i.id}>
                 <tr className={open === i.id ? "bg-stone-50" : "hover:bg-stone-50"}>
                   <td className="py-3 pl-4">
-                    <input type="checkbox" aria-label={`Select ${i.creditor}`} checked={checked.has(i.id)} onChange={() => toggle(i.id)} />
+                    <input type="checkbox" aria-label={`Select ${i.creditor}`} disabled={Boolean(reviewError([i]))} checked={checked.has(i.id) && !reviewError([i])} onChange={() => toggle(i.id)} />
                   </td>
                   <td className="px-3 py-3">
                     <button className="text-left" onClick={() => setOpen(open === i.id ? null : i.id)} aria-expanded={open === i.id}>
                       <span className="font-medium hover:underline">{i.creditor}</span>
                       {i.identity_theft && <span className="ml-2 text-xs font-medium text-red-700">ID theft</span>}
                       <span className="block font-mono text-xs text-stone-500">{i.account_number || "—"}</span>
+                      <span className="block text-xs text-stone-600">{REVIEW_LABELS[reviewStage(i)]} · {PAYMENT_LABELS[i.payment_status || "unconfirmed"]}</span>
                     </button>
                   </td>
                   <td className="px-3 py-3 text-stone-700">{CATEGORY_LABEL[i.category] ?? i.category}</td>
@@ -175,6 +184,21 @@ function ItemDetail({
   reload: () => Promise<void>;
 }) {
   const [notes, setNotes] = useState(i.notes);
+  const [payment, setPayment] = useState(i.payment_status || "unconfirmed");
+  const [stage, setStage] = useState(reviewStage(i));
+  const [evidence, setEvidence] = useState(i.evidence_notes || "");
+  const [reviewMessage, setReviewMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+  async function saveReview() {
+    setSaving(true);
+    setReviewMessage("");
+    try {
+      await patch(i.id, { payment_status: payment, review_stage: stage, evidence_notes: evidence });
+      setReviewMessage("Review saved.");
+    } catch (e) {
+      setReviewMessage(e instanceof Error ? e.message : "Could not save review.");
+    } finally { setSaving(false); }
+  }
   const h = "text-xs font-semibold uppercase tracking-wide text-stone-500";
 
   async function flagTheft(on: boolean) {
@@ -190,6 +214,28 @@ function ItemDetail({
 
   return (
     <div className="grid gap-5 lg:grid-cols-2">
+      <section className="space-y-3 rounded-lg border border-stone-200 bg-white p-4 lg:col-span-2">
+        <h3 className="font-semibold">Account review</h3>
+        <p className="text-sm text-stone-600">{evidenceChecklist(i)}</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm">Payment status you confirmed
+            <select className={inputClass} value={payment} onChange={e => setPayment(e.target.value as typeof payment)}>
+              {Object.entries(PAYMENT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <label className="text-sm">Next step
+            <select className={inputClass} value={stage} onChange={e => setStage(e.target.value as typeof stage)}>
+              {Object.entries(REVIEW_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+        </div>
+        <label className="block text-sm">Evidence reviewed and proposed request
+          <textarea className={inputClass} rows={4} maxLength={12000} value={evidence} onChange={e => setEvidence(e.target.value)} placeholder="Document/date, bureau and month, reported value, what your records show, and what correction or voluntary request you want. List anything still unknown." />
+        </label>
+        <p className="text-xs text-stone-500">Record document references here; this field does not upload attachments. Ready means you reviewed the facts, not that removal is guaranteed. Payment status may remain unconfirmed if it is unrelated to the specific issue.</p>
+        <Button disabled={saving || (stage === "ready" && !evidence.trim())} onClick={saveReview}>{saving ? "Saving…" : "Save review"}</Button>
+        <p role="status" className="text-sm">{reviewMessage}</p>
+      </section>
       <div className="space-y-4">
         <div>
           <h3 className={h}>As reported</h3>
@@ -205,7 +251,7 @@ function ItemDetail({
           </p>
         </div>
         <div>
-          <h3 className={h}>What&apos;s wrong</h3>
+          <h3 className={h}>Findings to verify</h3>
           <ul className="mt-1 list-disc space-y-1 pl-5 text-stone-700">
             {i.issues.map((x, n) => (
               <li key={n}>{x}</li>

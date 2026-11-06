@@ -1,3 +1,4 @@
+import { reviewStage } from "./review";
 import { all, db, run } from "./db";
 import { mergedStatus, uniqueStrings } from "./dedupe";
 import { getItems, toLetter } from "./store";
@@ -65,6 +66,12 @@ export function mergeInto(keep: Item, dupes: Item[]) {
       group.some((i) => i.identity_theft) ? 1 : 0,
       keep.id,
     );
+    // Preserve holds and evidence across manual merges; conflicting payment confirmations need review.
+    const confirmed = [...new Set(group.map(i => i.payment_status).filter(s => s && s !== "unconfirmed"))];
+    run("UPDATE items SET review_stage = ?, payment_status = ?, evidence_notes = ? WHERE id = ?",
+      group.some(i => reviewStage(i) === "hold") ? "hold" : keep.review_stage,
+      confirmed.length === 1 ? confirmed[0] : "unconfirmed",
+      uniqueStrings(group.map(i => i.evidence_notes || "")).join("\n\n"), keep.id);
     // Keep letter history attached to the surviving item.
     for (const row of all("SELECT * FROM letters WHERE client_id = ?", keep.client_id)) {
       const l = toLetter(row);

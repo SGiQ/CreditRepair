@@ -197,3 +197,37 @@ start it again. The previous database is kept beside the restored one.
 - `src/lib/letterDoc.ts` — PDF / Word layout.
 
 Uploaded reports are sent to the Anthropic API for analysis. Nothing else leaves this machine.
+
+## Evidence and follow-up safeguards
+
+New analyses are instructed to distinguish documented discrepancies from questions needing evidence,
+include report locations and quoted values, and distinguish paid/settled accounts from unpaid or unknown
+accounts. These are model-generated findings requiring human verification, not validated citations.
+Existing analyses are unchanged until a report is analyzed again.
+
+Goodwill drafts must not offer payment or settlement. Verification-procedure drafts require a recorded
+verified bureau response for each account and recipient. No-response status follow-ups require confirmed
+delivery of a real bureau dispute and a conservative 60-day wait (45 days plus a notification/mail buffer).
+This workflow buffer is not the statutory deadline. Existing dashboard reminders still use their original
+30-day tracking convention and should not be read as a legal finding.
+
+The default model remains Claude Opus 5.5; CLAUDE_MODEL can override it. Compare models on redacted
+reports with independently checked facts before switching. No model guarantees deletion.
+
+Run the follow-up regression tests with:
+`node --experimental-strip-types --test src/lib/disputeGuards.test.ts`
+
+## Evidence-first account review
+
+In **Negative items**, open an account and use **Account review**:
+1. Confirm its payment status from current records, or leave it **Unconfirmed**.
+2. Keep **Gather evidence** selected while collecting the listed documents.
+3. Record document dates, bureau/month, the discrepancy, and the intended request in evidence notes.
+4. Choose **Reviewed — ready to draft** and save when you have reviewed the facts.
+5. Select ready accounts and draft letters, or refresh the plan to incorporate the review.
+
+Unreviewed Planet Home/mortgage-named accounts default to **On hold**. Other accounts can be
+held manually. Held or unreviewed accounts cannot be included in new drafts or in-app mail sends;
+existing downloaded documents are not revoked. Releasing a hold is an explicit account-review change.
+The evidence field stores references and notes, not document attachments. Payment status remains
+separate from the report's status and is never inferred from the user's uncertainty.

@@ -1,3 +1,5 @@
+import { reviewError } from "@/lib/review";
+import { getItems } from "@/lib/store";
 import { requireClientAccess } from "@/lib/auth";
 import { bad, ok, idOf, type Ctx } from "@/lib/http";
 import { getLetter, markLetterSent } from "@/lib/store";
@@ -9,6 +11,9 @@ export async function POST(req: Request, ctx: Ctx) {
   const auth = await requireClientAccess(letter.client_id);
   if (auth instanceof Response) return auth;
   if (letter.status !== "draft") return bad("This has already been marked as sent.");
+
+  const reviewProblem = reviewError(getItems(letter.client_id).filter(i => letter.item_ids.includes(i.id)));
+  if (reviewProblem) return bad(reviewProblem);
 
   const today = new Date().toISOString().slice(0, 10);
   const { date = today } = await req.json().catch(() => ({}));

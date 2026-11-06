@@ -1,3 +1,5 @@
+import { reviewError } from "@/lib/review";
+import { getItems } from "@/lib/store";
 import { PDFDocument } from "pdf-lib";
 import { requireAdmin } from "@/lib/auth";
 import { run } from "@/lib/db";
@@ -18,6 +20,9 @@ export async function POST(req: Request, ctx: Ctx) {
   const letter = getLetter(await idOf(ctx));
   const client = letter && getClient(letter.client_id);
   if (!letter || !client) return bad("Letter not found", 404);
+  const reviewProblem = reviewError(getItems(letter.client_id).filter(i => letter.item_ids.includes(i.id)));
+  if (reviewProblem) return bad(reviewProblem);
+
   const { preview = false, returnReceipt = false, waiveFee = false } = await req.json().catch(() => ({}));
 
   if (!canMail(letter.type)) return bad("This document can't be sent through the mail service.");

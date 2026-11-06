@@ -1,4 +1,6 @@
 import { get, run } from "./db";
+import { reviewError } from "./review";
+import { followUpError } from "./disputeGuards";
 import { analyzeReport, draftLetter, friendlyError, type Analysis } from "./agent";
 import { sameAccount } from "./dedupe";
 import { knownItems, mergeInto } from "./merge";
@@ -124,6 +126,8 @@ export function createLetters(clientId: number, type: LetterType, itemIds: numbe
   const client = getClient(clientId);
   if (!client) throw new Error("Client not found");
   let items = getItems(clientId).filter((i) => itemIds.includes(i.id));
+  const reviewProblem = reviewError(items);
+  if (reviewProblem) throw new Error(reviewProblem);
   if (type === "cfpb_complaint") {
     const history = getLetters(clientId);
     items = items.filter((i) => cfpbReady(i.id, history));
@@ -143,6 +147,11 @@ export function createLetters(clientId: number, type: LetterType, itemIds: numbe
   if (!plan.length) throw new Error("No selected items match the chosen bureaus.");
 
   const history = getLetters(clientId).filter((l) => l.status !== "error");
+  // Validate the entire batch before creating any drafts.
+  for (const p of plan) {
+    const error = followUpError(type, p.items.map(i => i.id), p.recipient_name, history);
+    if (error) throw new Error(error);
+  }
   const ids: number[] = [];
   for (const p of plan) {
     const pIds = p.items.map((i) => i.id);

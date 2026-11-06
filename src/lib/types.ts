@@ -89,6 +89,9 @@ export interface Law {
 }
 
 export interface Item {
+  review_stage: "unreviewed" | "gather" | "ready" | "hold";
+  payment_status: "unconfirmed" | "unpaid" | "paid" | "settled";
+  evidence_notes: string;
   id: number;
   client_id: number;
   report_id: number | null;
@@ -150,10 +153,10 @@ export const LETTER_TYPES = {
     desc: "FCRA §611(a)(6)(B)(iii) & (a)(7) demand after an item comes back 'verified'.",
   },
   no_response: {
-    label: "No response in 30 days (follow-up)",
+    label: "No response (status follow-up)",
     to: "bureau",
     stage: "Follow-up",
-    desc: "FCRA §611(a)(1)(A) deletion demand when the bureau misses its deadline.",
+    desc: "Request investigation results after confirmed receipt and a conservative waiting period; not an automatic deletion demand.",
   },
   goodwill: {
     label: "Goodwill / pay-for-delete request",

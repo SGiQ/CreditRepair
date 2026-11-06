@@ -1,3 +1,4 @@
+import { reviewStage } from "./review";
 import { friendlyError, generatePlan } from "./agent";
 import { get, run } from "./db";
 import { createLetters } from "./jobs";
@@ -86,13 +87,13 @@ export function draftRound(clientId: number, round: number): { started: number; 
   const plan = getPlan(clientId);
   const r = plan?.data?.rounds.find((x) => x.round === round);
   if (!plan || !r) throw new Error("That round isn't in the plan.");
-  const open = new Set(getItems(clientId).filter((i) => i.status !== "deleted" && i.status !== "updated").map((i) => i.id));
+  const open = new Set(getItems(clientId).filter((i) => i.status !== "deleted" && i.status !== "updated" && reviewStage(i) === "ready").map((i) => i.id));
   let started = 0;
   const skipped: string[] = [];
   for (const a of r.actions) {
     const ids = a.item_ids.filter((id) => open.has(id));
     if (!ids.length) {
-      skipped.push(`${a.letter_type.replace(/_/g, " ")}: its items are no longer open`);
+      skipped.push(`${a.letter_type.replace(/_/g, " ")}: its items are held, awaiting evidence, or resolved`);
       continue;
     }
     try {

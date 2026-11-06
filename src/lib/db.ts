@@ -162,6 +162,9 @@ CREATE TABLE IF NOT EXISTS freezes (
 
 // Columns added after the first release; applied to existing databases on startup.
 const COLUMNS: [table: string, column: string, ddl: string][] = [
+  ["items", "review_stage", "TEXT NOT NULL DEFAULT 'unreviewed'"],
+  ["items", "payment_status", "TEXT NOT NULL DEFAULT 'unconfirmed'"],
+  ["items", "evidence_notes", "TEXT NOT NULL DEFAULT ''"],
   ["clients", "signature", "TEXT NOT NULL DEFAULT ''"],
   ["clients", "signature_at", "TEXT NOT NULL DEFAULT ''"],
   ["letters", "signed_at", "TEXT NOT NULL DEFAULT ''"],
